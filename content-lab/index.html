@@ -328,7 +328,7 @@ async function busy(btn, label, fn) {
 // ---------- brand context (fed to every prompt) ----------
 const BIBLE_FIELDS = [
   ['about', 'What Videobolt is'], ['voice', 'Voice and tone'], ['use', 'Words and phrases we use'], ['avoid', 'Words and phrases we avoid'],
-  ['audiences', 'Audiences'], ['pillars', 'Content pillars'], ['ctas', 'Calls to action'], ['platforms', 'Platforms and specs'],
+  ['mechanics', 'Grammar and mechanics (follow exactly)'], ['audiences', 'Audiences'], ['pillars', 'Content pillars'], ['ctas', 'Calls to action'], ['platforms', 'Platforms and specs'],
 ];
 function brandContext(limit = 2400) {
   const b = S.bible || {};
@@ -472,6 +472,7 @@ VIEWS_RENDER_.bible = () => {
         ${ta('about', 'What Videobolt is', 'One or two lines: what we make, who it is for, what makes it different.')}
         ${ta('voice', 'Voice and tone', 'e.g. Talks like a working editor, not a marketer. Short sentences. Dry humour allowed. Never condescending about skill level.', 'tall')}
         <div class="row">${ta('use', 'Words we use', 'templates, drag-and-drop, render, …')}${ta('avoid', 'Words we avoid', 'game-changer, unleash, elevate, …')}</div>
+        ${ta('mechanics', 'Grammar and mechanics', 'Spelling, punctuation, numbers, capitalization, formatting rules', 'tall')}
         ${ta('audiences', 'Audiences', 'Who we talk to, and what each one wants from a video.')}
         ${ta('pillars', 'Content pillars', 'The 3–5 themes we keep coming back to.')}
         ${ta('ctas', 'Calls to action', 'What we ask people to do, and how we phrase it.')}
