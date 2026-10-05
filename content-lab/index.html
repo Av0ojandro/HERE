@@ -133,6 +133,24 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .rowedit{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .rowedit .fields{display:flex;flex-direction:column;gap:6px;min-width:0}
 
+.lk-wrap{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:16px;align-items:start}
+.frame{aspect-ratio:9/16;max-width:100%;border-radius:10px;padding:18px 14px;display:flex;flex-direction:column;gap:10px;justify-content:flex-end;position:relative;overflow:hidden;border:1px solid var(--line)}
+.lk-logo{position:absolute;top:14px;left:14px;max-width:45%;max-height:34px;object-fit:contain}
+.lk-head{font-size:25px;line-height:1.05;font-weight:800;overflow-wrap:anywhere}
+.lk-bar{height:5px;width:42%;border-radius:3px}
+.lk-cap{font-size:11px;font-weight:600;letter-spacing:.05em}
+.swatches{display:flex;flex-direction:column;gap:10px;min-width:0}
+.sw{display:grid;grid-template-columns:34px minmax(0,1fr);gap:0 10px;align-items:center;font-size:13px}
+.sw i{grid-row:span 2;width:34px;height:34px;border-radius:6px;border:1px solid var(--line)}
+.ty{display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
+.swrow{display:grid;grid-template-columns:46px minmax(0,1fr);gap:6px}
+input[type=color]{width:46px;height:38px;padding:3px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);cursor:pointer}
+.grid-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.imgcard{border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--bg);min-width:0}
+.imgcard img{width:100%;aspect-ratio:1;object-fit:contain;background:var(--sunk);border-radius:4px}
+.imgcard .chk{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);cursor:pointer}
+label.btn{position:relative}
+@media (max-width:520px){.lk-wrap{grid-template-columns:minmax(0,1fr)}.frame{width:200px}}
 .savebar{position:sticky;bottom:0;margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 -4px 18px rgba(0,0,0,.06)}
 
 /* drawer */
@@ -202,15 +220,15 @@ function toast(msg) {
 }
 
 // ---------- state ----------
-const COLLS = ['teardowns','patterns','competitors','watch','digests','shifts','concepts','scripts'];
-const S = { bible: {}, teardowns: [], patterns: [], competitors: [], watch: [], digests: [], shifts: [], concepts: [], scripts: [] };
+const COLLS = ['teardowns','patterns','competitors','watch','digests','shifts','concepts','scripts','brandImages'];
+const S = { bible: {}, teardowns: [], patterns: [], competitors: [], watch: [], digests: [], shifts: [], concepts: [], scripts: [], brandImages: [] };
 const UI = {
   view: (lsGet('vbl-view') || 'bible'), sub: lsGet('vbl-sub') || {},
   genResults: [], genSeed: null, scriptId: lsGet('vbl-script') || null, stage: 'beats',
   tdImages: [], watchImages: [], bibleDraft: null, bibleDirty: false, patFilter: 'all', boardFilter: 'all',
 };
 const VIEWS = [
-  {id:'bible', tid:'V1', name:'Brand bible', sub:'Voice, series, personas'},
+  {id:'bible', tid:'V1', name:'Brand bible', sub:'Voice, look, series'},
   {id:'teardown', tid:'V2', name:'Teardowns', sub:'Reference videos, patterns'},
   {id:'watch', tid:'V3', name:'Market watch', sub:'Competitors, digests'},
   {id:'concepts', tid:'V4', name:'Concepts', sub:'Generate, rate, shortlist'},
@@ -275,11 +293,12 @@ function handleWriteError(e) {
 const get = (coll, id) => S[coll].find(x => x.id === id);
 
 // ---------- Claude in the page ----------
-let SAMPLE = null, IMG = null, DL = null;
+let SAMPLE = null, IMG = null, DL = null, AS = null;
 async function initSample() {
   try { SAMPLE = window.claude?.use ? await window.claude.use('sample') : null; } catch { SAMPLE = null; }
   if (SAMPLE) { try { IMG = (await SAMPLE.limits())?.images || null; } catch { IMG = null; } }
   try { DL = window.claude?.use ? await window.claude.use('downloads') : null; } catch { DL = null; }
+  try { AS = window.claude?.use ? await window.claude.use('assets') : null; } catch { AS = null; }
   paintStatus(); render();
 }
 async function ask(prompt, { json = false, images, onText, tier } = {}) {
@@ -322,7 +341,23 @@ function brandContext(limit = 2400) {
   const refs = list(b.refs).filter(r => r.text);
   if (refs.length) out.push('Reference scripts we consider on-brand (match this voice):\n' + refs.slice(0, 4).map(r => `### ${r.title || 'Untitled'}\n${r.text.slice(0, limit)}`).join('\n\n'));
   if (out.length === 1) out.push('(The brand bible is mostly empty. Write in a clear, confident, creator-friendly voice for a motion graphics and video template company, and say in whyOnBrand fields that the bible needs filling in.)');
+  const look = lookContext();
+  out.push(look || 'VISUAL IDENTITY: not filled in yet. Keep visual suggestions simple and say where a brand look decision is needed.');
   return out.join('\n\n');
+}
+const LOOK_FIELDS = [['lookLogo', 'Logo usage'], ['lookMotion', 'Motion style'], ['lookText', 'On-screen text and captions'], ['lookCamera', 'Camera, lighting and grade'],
+  ['lookGraphics', 'Graphic elements'], ['lookSound', 'Music and sound'], ['lookDos', 'Visual do'], ['lookDonts', 'Visual don\u2019t']];
+function lookContext() {
+  const b = S.bible || {}; const out = [];
+  const cs = list(b.lookColors).filter(c => c.hex || c.name);
+  if (cs.length) out.push('Colours:\n' + cs.map(c => `- ${c.name || 'Unnamed'} ${validHex(c.hex) || c.hex || ''}${c.role ? ' (' + c.role + ')' : ''}${c.usage ? ': ' + c.usage : ''}`).join('\n'));
+  const ts = list(b.lookType).filter(t => t.font);
+  if (ts.length) out.push('Typography:\n' + ts.map(t => `- ${cap(t.role || 'type')}: ${t.font}${t.style ? ', ' + t.style : ''}${t.usage ? ' — ' + t.usage : ''}`).join('\n'));
+  for (const [k, label] of LOOK_FIELDS) if (b[k]?.trim()) out.push(`${label}:\n${b[k].trim()}`);
+  const ims = S.brandImages.filter(i => i.caption);
+  if (ims.length) out.push('Reference images on file: ' + ims.map(i => `${i.kind}: ${i.caption}`).join('; '));
+  if (!out.length) return '';
+  return 'VISUAL IDENTITY: how Videobolt looks. Every visual idea, shot, on-screen text, thumbnail, graphic and motion choice must follow it. Refer to colours and typefaces by name.\n\n' + out.join('\n\n');
 }
 const wpm = () => num(S.bible?.wpm) || 150;
 
@@ -330,7 +365,7 @@ const wpm = () => num(S.bible?.wpm) || 150;
 const VIEWS_RENDER = {}, PAINT = {};
 let generating = false;
 function paintTracks() {
-  const counts = { bible: bibleScore().pct + '%', teardown: S.teardowns.length, watch: S.watch.length, concepts: S.concepts.length, scripts: S.scripts.length };
+  const counts = { bible: bibleScore().allPct + '%', teardown: S.teardowns.length, watch: S.watch.length, concepts: S.concepts.length, scripts: S.scripts.length };
   $('#tracks').innerHTML = VIEWS.map(v => `<button class="track" data-view="${v.id}" aria-current="${UI.view === v.id}">
     <span class="tid">${v.tid}</span><span class="tname">${v.name}<span class="tsub">${v.sub}</span></span><span class="tcount">${counts[v.id]}</span></button>`).join('');
 }
@@ -377,16 +412,58 @@ function bibleScore(b = S.bible || {}) {
     ['Account personas', list(b.personas).filter(p => p.name).length >= 1],
     ['Calls to action', !!b.ctas?.trim()], ['Two or more reference scripts', list(b.refs).filter(r => r.text?.trim()).length >= 2],
   ];
-  return { checks, pct: Math.round(100 * checks.filter(c => c[1]).length / checks.length) };
+  const look = [
+    ['Two or more brand colours', list(b.lookColors).filter(c => c.hex).length >= 2],
+    ['Typefaces', list(b.lookType).filter(t => t.font).length >= 1],
+    ['Logo usage', !!b.lookLogo?.trim()], ['Motion style', !!b.lookMotion?.trim()],
+    ['On-screen text and captions', !!b.lookText?.trim()], ['Camera, lighting and grade', !!b.lookCamera?.trim()],
+    ['Visual do’s and don’ts', !!(b.lookDos?.trim() || b.lookDonts?.trim())],
+    ['Logo or reference images', S.brandImages.length >= 1],
+  ];
+  const pct = a => Math.round(100 * a.filter(c => c[1]).length / a.length);
+  return { checks, look, pct: pct(checks), lookPct: pct(look), allPct: pct([...checks, ...look]) };
 }
 function draft() { if (!UI.bibleDraft) UI.bibleDraft = clone(S.bible || {}) || {}; return UI.bibleDraft; }
 const VIEWS_RENDER_ = VIEWS_RENDER;
 VIEWS_RENDER_.bible = () => {
   const b = draft();
+  const s = sub('bible', 'voice');
   const ta = (k, label, ph, cls = '') => `<label class="f">${label}<textarea id="b-${k}" data-bk="${k}" class="${cls}" placeholder="${esc(ph)}">${esc(b[k] || '')}</textarea></label>`;
-  return `
-  <div class="vhead"><div><div class="eyebrow">V1 · Set once, edit any time</div><h1>Brand bible</h1>
-    <p>Every concept, teardown and script reads from this page. The more specific it is, the more the output sounds like Videobolt.</p></div></div>
+  const head = `<div class="vhead"><div><div class="eyebrow">V1 · Set once, edit any time</div><h1>${s === 'voice' ? 'Brand bible' : 'Visual identity'}</h1>
+    <p>${s === 'voice' ? 'Every concept, teardown and script reads from this page. The more specific it is, the more the output sounds like Videobolt.' : 'How Videobolt looks. Concepts, scripts, shot lists, thumbnails and the brand check all follow these rules.'}</p></div>
+    ${subtabs('bible', [['voice', 'Voice and language'], ['look', 'Visual identity']], 'voice')}</div>`;
+  const save = `<div class="savebar"><span id="b-state" class="tc">${UI.bibleDirty ? 'Unsaved changes' : (S.bible?.updatedAt ? 'Saved ' + fmtDate(S.bible.updatedAt) : 'Not saved yet')}</span>
+    <div class="actions"><button class="btn ghost" id="b-revert" ${UI.bibleDirty ? '' : 'disabled'}>Discard changes</button><button class="btn primary" id="b-save">Save brand bible</button></div></div>`;
+  if (s === 'look') return `${head}
+  <div class="cols">
+    <div class="stack">
+      <div class="panel"><h2>Readiness</h2><p class="hint">What the generator still needs to know about the look.</p><div id="b-score"></div></div>
+      <div class="panel form"><h2>Fill from your brand guide</h2><p class="hint" style="margin:0">${IMG ? 'Add screenshots of your brand guide pages, paste its text, or both.' : 'Paste the text of your brand guide.'} Claude fills in the empty fields here. Review them before saving.</p>
+        ${IMG ? `<label class="f">Brand guide pages <span class="opt">(screenshots, up to ${IMG.maxCount || 4})</span><input type="file" id="lk-imp-images" accept="image/png,image/jpeg,image/webp" multiple></label><div class="thumbs" id="lk-imp-thumbs"></div>` : ''}
+        <label class="f">Brand guide text <span class="opt">(optional)</span><textarea id="lk-imp-text" placeholder="Colour codes, font names, logo rules, motion notes…"></textarea></label>
+        <div class="actions"><button class="btn primary" id="lk-imp-run">Read brand guide</button></div><div id="lk-imp-msg"></div>
+      </div>
+      <div class="panel form"><h2>Look and feel</h2>
+        ${ta('lookLogo', 'Logo usage', 'Placement, minimum size, clear space, end card, watermark, what never to do with it')}
+        ${ta('lookMotion', 'Motion style', 'Pacing, cut rhythm, transitions, easing, how text and graphics animate in and out')}
+        ${ta('lookText', 'On-screen text and captions', 'Case, position, safe zones for 9:16, words per line, caption style (e.g. ALL CAPS, no punctuation except ? and ’)')}
+        ${ta('lookCamera', 'Camera, lighting and grade', 'Framing, lenses, handheld or locked off, lighting, colour grade, wardrobe and set')}
+        ${ta('lookGraphics', 'Graphic elements', 'Shapes, textures, lower thirds, frames, icons, stickers')}
+        ${ta('lookSound', 'Music and sound', 'Genres, energy, sound design, use of trending audio')}
+        <div class="row">${ta('lookDos', 'Visual do’s', '')}${ta('lookDonts', 'Visual don’ts', '')}</div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel"><h2>Preview</h2><p class="hint">A rough 9:16 frame built from the colours, type and logo on this page.</p><div id="lk-preview"></div></div>
+      <div class="panel"><h2>Colours</h2><p class="hint">Give each colour a role, so Claude knows what goes where.</p>
+        <div class="list" id="b-lookColors"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="lookColors">Add colour</button></div></div>
+      <div class="panel"><h2>Typography</h2><p class="hint">Fonts by role. Google Fonts show in the preview.</p>
+        <div class="list" id="b-lookType"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="lookType">Add typeface</button></div></div>
+      <div class="panel"><h2>Logo and reference images</h2><p class="hint">Logo files, frames that look right, end cards, thumbnails. Tick “Show to Claude” on up to two and they're attached when it writes concepts, scripts and shot lists. Changes here save straight away.</p>
+        <div id="lk-upload" style="margin-bottom:10px"></div><div class="grid-imgs" id="lk-images"></div></div>
+    </div>
+  </div>${save}`;
+  return `${head}
   <div class="cols">
     <div class="stack">
       <div class="panel"><h2>Readiness</h2><p class="hint">What the generator still needs from you.</p><div id="b-score"></div></div>
@@ -410,38 +487,120 @@ VIEWS_RENDER_.bible = () => {
       <div class="panel"><h2>Reference scripts</h2><p class="hint">Scripts you're proud of. These carry the voice better than any rule.</p>
         <div class="list" id="b-refs"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="refs">Add script</button></div></div>
     </div>
-  </div>
-  <div class="savebar"><span id="b-state" class="tc">${UI.bibleDirty ? 'Unsaved changes' : (S.bible?.updatedAt ? 'Saved ' + fmtDate(S.bible.updatedAt) : 'Not saved yet')}</span>
-    <div class="actions"><button class="btn ghost" id="b-revert" ${UI.bibleDirty ? '' : 'disabled'}>Discard changes</button><button class="btn primary" id="b-save">Save brand bible</button></div></div>`;
+  </div>${save}`;
 };
+const COLOR_ROLES = ['primary', 'secondary', 'accent', 'background', 'text', 'highlight', 'other'];
+const TYPE_ROLES = ['headline', 'subhead', 'body', 'on-screen text', 'captions', 'logo wordmark', 'other'];
 const ARR = {
-  series: { fields: [['name', 'Name', 'e.g. Designer’s Picks'], ['desc', 'What it is', 'Format, length, structure, cadence', true]] },
-  personas: { fields: [['name', 'Persona', 'e.g. The Curator'], ['handle', 'Account', '@handle'], ['desc', 'How they talk', 'Voice, angle, what they post', true]] },
-  refs: { fields: [['title', 'Title', 'Script title'], ['text', 'Script', 'Paste the full script', true]] },
+  series: { fields: [['name', 'Name', 'e.g. Designer’s Picks'], ['desc', 'What it is', 'Format, length, structure, cadence', 'area']] },
+  personas: { fields: [['name', 'Persona', 'e.g. The Curator'], ['handle', 'Account', '@handle'], ['desc', 'How they talk', 'Voice, angle, what they post', 'area']] },
+  refs: { fields: [['title', 'Title', 'Script title'], ['text', 'Script', 'Paste the full script', 'area']] },
+  lookColors: { fields: [['hex', 'Colour', '#2B45D4', 'color'], ['name', 'Name', 'e.g. Bolt Blue'], ['role', 'Role', '', COLOR_ROLES], ['usage', 'Usage', 'Where it goes, and where it never goes']] },
+  lookType: { fields: [['role', 'Role', '', TYPE_ROLES], ['font', 'Typeface', 'e.g. Montserrat'], ['style', 'Weight and style', 'e.g. ExtraBold, all caps, tight tracking'], ['usage', 'Usage', 'Where it is used']] },
 };
+const cap = s => String(s || '').replace(/^./, c => c.toUpperCase());
+const validHex = h => { const m = String(h || '').trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i); if (!m) return null; let x = m[1]; if (x.length === 3) x = [...x].map(c => c + c).join(''); return '#' + x.toUpperCase(); };
+const safeFont = f => String(f || '').replace(/[^\w \-]/g, '').trim().slice(0, 60);
+function fieldHtml(k, i, it, [f, label, ph, kind]) {
+  const a = `data-arr="${k}" data-i="${i}" data-k="${f}" aria-label="${label}"`;
+  if (kind === 'area') return `<textarea ${a} placeholder="${esc(ph)}" class="${k === 'refs' ? 'tall' : ''}">${esc(it[f] || '')}</textarea>`;
+  if (kind === 'color') return `<div class="swrow"><input type="color" ${a} value="${validHex(it[f]) || '#888888'}"><input type="text" ${a} placeholder="${esc(ph)}" value="${esc(it[f] || '')}"></div>`;
+  if (Array.isArray(kind)) return `<select ${a}><option value="">${label}…</option>${kind.map(o => `<option value="${o}" ${String(it[f] || '').toLowerCase() === o ? 'selected' : ''}>${cap(o)}</option>`).join('')}</select>`;
+  return `<input type="text" ${a} placeholder="${esc(ph)}" value="${esc(it[f] || '')}">`;
+}
 function paintBibleArrays() {
   const b = draft();
   for (const k of Object.keys(ARR)) {
     const el = $('#b-' + k); if (!el) continue;
     const arr = list(b[k]);
-    el.innerHTML = arr.length ? arr.map((it, i) => `<div class="rowedit"><div class="fields">${ARR[k].fields.map(([f, label, ph, big]) =>
-      big ? `<textarea data-arr="${k}" data-i="${i}" data-k="${f}" aria-label="${label}" placeholder="${esc(ph)}" class="${k === 'refs' ? 'tall' : ''}">${esc(it[f] || '')}</textarea>`
-          : `<input type="text" data-arr="${k}" data-i="${i}" data-k="${f}" aria-label="${label}" placeholder="${esc(ph)}" value="${esc(it[f] || '')}">`).join('')}</div>
+    el.innerHTML = arr.length ? arr.map((it, i) => `<div class="rowedit"><div class="fields">${ARR[k].fields.map(fd => fieldHtml(k, i, it, fd)).join('')}</div>
       <button class="btn small ghost danger" data-rm="${k}:${i}" aria-label="Remove">Remove</button></div>`).join('')
       : `<div class="empty">Nothing here yet.</div>`;
   }
 }
 function paintBibleScore() {
-  const { checks, pct } = bibleScore(draft());
+  const r = bibleScore(draft()); const look = sub('bible', 'voice') === 'look';
+  const checks = look ? r.look : r.checks, pct = look ? r.lookPct : r.pct;
   const el = $('#b-score'); if (!el) return;
   el.innerHTML = `<div class="actions" style="margin-bottom:8px"><strong style="font-family:var(--f-display);font-size:24px;font-stretch:110%">${pct}%</strong><span class="spacer"></span><span class="tc">${checks.filter(c => c[1]).length}/${checks.length}</span></div>
     <div class="meter"><i style="width:${pct}%"></i></div><div class="checks" style="margin-top:10px">${checks.map(([l, ok]) => `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '○'} ${l}</div>`).join('')}</div>`;
 }
+const loadedFonts = new Set();
+function loadFont(name) {
+  const f = safeFont(name); if (!f || loadedFonts.has(f)) return; loadedFonts.add(f);
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;600;800&display=swap`;
+  document.head.append(l);
+}
+function contrastOn(hex) {
+  const h = validHex(hex); if (!h) return '#FFFFFF';
+  const [r, g, bl] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * bl) > 0.4 ? '#111111' : '#FFFFFF';
+}
+function paintLookPreview() {
+  const el = $('#lk-preview'); if (!el) return;
+  const b = draft();
+  const cs = list(b.lookColors).map(c => ({ ...c, hex: validHex(c.hex) })).filter(c => c.hex);
+  const ts = list(b.lookType).filter(t => safeFont(t.font));
+  const logo = S.brandImages.find(i => i.kind === 'logo' && i.assetId);
+  if (!cs.length && !ts.length && !logo) { el.innerHTML = `<div class="empty">Add colours and typefaces and the preview builds itself here.</div>`; return; }
+  const pick = (...roles) => cs.find(c => roles.includes(String(c.role || '').toLowerCase()));
+  const bg = (pick('background') || pick('primary') || cs[0])?.hex || '#202020';
+  const fg = pick('text')?.hex || contrastOn(bg);
+  const ac = (pick('accent') || pick('highlight') || pick('secondary') || cs.find(c => c.hex !== bg))?.hex || fg;
+  const tf = (...roles) => ts.find(t => roles.some(r => String(t.role || '').toLowerCase() === r));
+  const hf = tf('headline', 'logo wordmark') || ts[0], bf = tf('on-screen text', 'captions', 'body') || hf;
+  ts.forEach(t => loadFont(t.font));
+  const fam = t => t ? `'${safeFont(t.font)}', var(--f-display)` : 'var(--f-display)';
+  const series = list(b.series).find(x => x.name)?.name || 'Your headline here';
+  el.innerHTML = `<div class="lk-wrap">
+    <div class="frame" style="background:${bg};color:${fg}" aria-label="Brand preview frame">
+      ${logo ? `<img class="lk-logo" alt="Logo" src="/_blob/${esc(logo.assetId)}">` : ''}
+      <div class="lk-head" style="font-family:${fam(hf)}">${esc(series)}</div>
+      <div class="lk-bar" style="background:${ac}"></div>
+      <div class="lk-cap" style="font-family:${fam(bf)}">CAPTION LINE SITS HERE</div>
+    </div>
+    <div class="swatches">${cs.map(c => `<div class="sw"><i style="background:${c.hex}"></i><span>${esc(c.name || 'Unnamed')}</span><span class="tc">${c.hex}${c.role ? ' · ' + esc(c.role) : ''}</span></div>`).join('')}
+      ${ts.map(t => `<div class="ty"><span style="font-family:${fam(t)};font-size:20px">${esc(safeFont(t.font))}</span><span class="tc">${esc(t.role || 'type')}${t.style ? ' · ' + esc(t.style) : ''}</span></div>`).join('')}</div>
+  </div>`;
+}
+function paintBrandImages() {
+  const up = $('#lk-upload');
+  if (up) up.innerHTML = AS ? `<label class="btn small" style="cursor:pointer">Add images<input type="file" id="lk-up-file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" multiple style="position:absolute;width:1px;height:1px;opacity:0"></label>`
+    : `<p class="hint" style="margin:0">Only people who can edit this page can add images.</p>`;
+  const el = $('#lk-images'); if (!el) return;
+  el.innerHTML = S.brandImages.length ? S.brandImages.map(im => `<div class="imgcard">
+      <img alt="${esc(im.caption || '')}" src="/_blob/${esc(im.assetId)}">
+      <select data-img="${im.id}" data-ik="kind" aria-label="Kind">${['logo', 'frame', 'end card', 'thumbnail', 'mood', 'other'].map(k => `<option value="${k}" ${im.kind === k ? 'selected' : ''}>${cap(k)}</option>`).join('')}</select>
+      <input type="text" data-img="${im.id}" data-ik="caption" aria-label="Caption" placeholder="What this shows" value="${esc(im.caption || '')}">
+      <label class="chk"><input type="checkbox" data-img="${im.id}" data-ik="useInPrompts" ${im.useInPrompts ? 'checked' : ''}> Show to Claude</label>
+      <button class="btn small ghost danger" data-del="brandImages:${im.id}">Delete</button></div>`).join('')
+    : `<div class="empty">No images yet. Add your logo first. It shows in the preview and on concept frames.</div>`;
+}
 function markBibleDirty() {
   UI.bibleDirty = true; const s = $('#b-state'); if (s) s.textContent = 'Unsaved changes';
-  const r = $('#b-revert'); if (r) r.disabled = false; paintBibleScore();
+  const r = $('#b-revert'); if (r) r.disabled = false; paintBibleScore(); paintLookPreview();
 }
-PAINT.bible = (what) => { if (!what || what === '*') { paintBibleArrays(); paintBibleScore(); } };
+PAINT.bible = (what) => {
+  if (!what || what === '*') { paintBibleArrays(); paintBibleScore(); paintLookPreview(); paintBrandImages(); }
+  else if (what === 'brandImages') { if (!$('#lk-images')?.contains(document.activeElement)) paintBrandImages(); paintLookPreview(); paintBibleScore(); }
+};
+async function brandImageBlobs() {
+  if (!IMG) return [];
+  const out = [];
+  for (const im of S.brandImages.filter(i => i.useInPrompts && i.assetId).slice(0, 2)) {
+    try { const r = await fetch('/_blob/' + im.assetId); if (!r.ok) continue; const bl = await r.blob(); if (/^image\/(png|jpeg|webp|gif)$/.test(bl.type)) out.push({ blob: bl, im }); } catch {}
+  }
+  return out;
+}
+// attach up to two brand reference images after any images the task already carries
+async function withLook(prompt, own = []) {
+  const max = IMG?.maxCount || 4;
+  const brand = (await brandImageBlobs()).slice(0, Math.max(0, max - own.length));
+  if (!brand.length) return { prompt, images: own };
+  const desc = brand.map(x => `${x.im.kind || 'reference'}: ${x.im.caption || 'untitled'}`).join('; ');
+  return { prompt: `${prompt}\n\nATTACHED IMAGES: ${own.length ? `the first ${own.length} are the material described above; the last ${brand.length}` : `${brand.length === 1 ? 'this is' : 'these are'}`} Videobolt brand reference image${brand.length === 1 ? '' : 's'} (${desc}). Match this look. Do not describe the images back.`, images: [...own, ...brand.map(x => x.blob)] };
+}
 
 // ================= V2 TEARDOWNS & PATTERNS =================
 function outlier(t) {
@@ -534,7 +693,7 @@ ${t.notes || '(none)'}
 Separate what is transferable from what only works because of this creator. Base everything on the material given; say when something can't be judged from it. Give 2–3 adaptations for Videobolt, each tied to one of our series or formats where possible.
 
 Reply with only JSON in this shape:
-{"summary":"one sentence naming what the video is and why it's here","hook":{"type":"question | pattern interrupt | bold claim | visual surprise | relatable pain | curiosity gap | other","firstSeconds":"what happens in the first 1-3s","whyItStops":"why a viewer stops scrolling"},"structure":{"beats":["beat 1","beat 2"],"payoff":"where the payoff lands and what it is","retention":"how it holds attention"},"craft":{"cuts":"","camera":"","onScreenText":"","sound":"","trends":""},"tone":"how the creator talks to the viewer","cta":{"ask":"","naturalness":""},"performance":"what the numbers say: outlier or normal for this account","whyItWorked":{"transferable":"the principle we can reuse","creatorSpecific":"what only works for them"},"adaptations":[{"title":"","series":"","logline":"","hook":""}],"patterns":[{"name":"short reusable name","kind":"hook | structure | format","description":"how to apply it"}]}`;
+{"summary":"one sentence naming what the video is and why it's here","hook":{"type":"question | pattern interrupt | bold claim | visual surprise | relatable pain | curiosity gap | other","firstSeconds":"what happens in the first 1-3s","whyItStops":"why a viewer stops scrolling"},"structure":{"beats":["beat 1","beat 2"],"payoff":"where the payoff lands and what it is","retention":"how it holds attention"},"craft":{"cuts":"","camera":"","onScreenText":"","sound":"","trends":""},"tone":"how the creator talks to the viewer","cta":{"ask":"","naturalness":""},"performance":"what the numbers say: outlier or normal for this account","whyItWorked":{"transferable":"the principle we can reuse","creatorSpecific":"what only works for them"},"adaptations":[{"title":"","series":"","logline":"","hook":"","look":"how it would look in our visual identity"}],"patterns":[{"name":"short reusable name","kind":"hook | structure | format","description":"how to apply it"}]}`;
 }
 function readTdForm() {
   const v = id => $('#' + id)?.value.trim() || '';
@@ -566,7 +725,7 @@ function openTeardown(id) {
       <div class="sec"><h4>CTA</h4><p>${esc(a.cta?.ask || '')}</p><p class="hint" style="margin:0">${esc(a.cta?.naturalness || '')}</p></div>
       <div class="sec"><h4>Performance read</h4><p>${esc(a.performance || '')}</p></div>
       <div class="sec"><h4>Why it worked</h4><p><strong>Transferable:</strong> ${esc(a.whyItWorked?.transferable || '')}</p><p><strong>Only works for them:</strong> ${esc(a.whyItWorked?.creatorSpecific || '')}</p></div>
-      <div class="sec"><h4>Videobolt adaptations</h4><div class="list">${list(a.adaptations).map((x, i) => `<div class="item"><div class="meta">${x.series ? `<span class="chip accent">${esc(x.series)}</span>` : ''}</div><h3>${esc(x.title)}</h3><p>${esc(x.logline)}</p><p><strong>Hook:</strong> ${esc(x.hook)}</p><div class="actions"><button class="btn small primary" data-adapt="${t.id}:${i}">Develop in concept generator</button></div></div>`).join('') || '<p class="hint">None.</p>'}</div></div>
+      <div class="sec"><h4>Videobolt adaptations</h4><div class="list">${list(a.adaptations).map((x, i) => `<div class="item"><div class="meta">${x.series ? `<span class="chip accent">${esc(x.series)}</span>` : ''}</div><h3>${esc(x.title)}</h3><p>${esc(x.logline)}</p><p><strong>Hook:</strong> ${esc(x.hook)}</p>${x.look ? `<p><strong>Our look:</strong> ${esc(x.look)}</p>` : ''}<div class="actions"><button class="btn small primary" data-adapt="${t.id}:${i}">Develop in concept generator</button></div></div>`).join('') || '<p class="hint">None.</p>'}</div></div>
       <div class="sec"><h4>Patterns added to the library</h4><div class="meta">${list(a.patterns).map(p => `<span class="chip">${esc(p.kind)}: ${esc(p.name)}</span>`).join('') || 'None'}</div></div>
     </div>` : `<div class="note">This reference has no analysis yet.</div>`}
     ${t.transcript ? `<details><summary class="eyebrow" style="cursor:pointer">Transcript</summary><p class="out">${esc(t.transcript)}</p></details>` : ''}
@@ -702,6 +861,7 @@ function conceptCard(c, saved, viewOnly = false) {
     <p><strong>Hook:</strong> ${esc(c.hook)}</p>
     ${list(c.beatsPreview).length ? `<ol style="margin:0;padding-left:20px;font-size:14px;color:var(--muted)">${list(c.beatsPreview).map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
     ${c.whyOnBrand ? `<p><strong>Why it’s us:</strong> ${esc(c.whyOnBrand)}</p>` : ''}
+    ${c.visualDirection ? `<p><strong>Look:</strong> ${esc(c.visualDirection)}</p>` : ''}
     ${list(c.production?.needs).length ? `<p><strong>Needs:</strong> ${list(c.production.needs).map(esc).join(', ')}</p>` : ''}
     ${c.templateTieIn ? `<p><strong>Template tie-in:</strong> ${esc(c.templateTieIn)}</p>` : ''}
     ${saved ? `<div class="actions"><span class="stars" aria-label="Rating">${[1,2,3,4,5].map(n => `<button class="${(c.rating || 0) >= n ? 'on' : ''}" data-rate="${c.id}:${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</span>
@@ -739,12 +899,13 @@ Account voice: ${f.persona || 'Main Videobolt voice'}
 ${f.hook ? 'Hook or occasion: ' + f.hook + '\n' : ''}${f.template ? 'Template to feature: ' + f.template + '\n' : ''}${pat ? `Build on this proven pattern from our library: ${pat.name} (${pat.kind}): ${pat.description}\n` : ''}${UI.genSeed ? 'Starting point: ' + UI.genSeed.text + '\n' : ''}${f.extra ? 'Extra direction: ' + f.extra + '\n' : ''}
 Rules:
 - Every concept must sound like the brand bible and respect the words we avoid.
+- Every concept must look like Videobolt: use the visual identity (colours by name, typefaces, motion style, on-screen text rules, logo use).
 - The hook must land in the first 1–3 seconds and work with the sound off.
 - Make the concepts genuinely different from each other (angle, structure, format), not variations of one idea.
 - Production tier: lean = one person on camera or a screen recording, no location; moderate = a location, props or a second person; heavy = several locations, extras, or animation beyond our templates.
 
 Reply with only a JSON array:
-[{"title":"","series":"","format":"","logline":"one or two sentences","hook":"exactly what happens and is said in the first 3 seconds","beatsPreview":["3-5 short beats"],"whyOnBrand":"","production":{"tier":"lean | moderate | heavy","needs":["people, location, props"]},"templateTieIn":"how a Videobolt template shows up, or empty"}]`;
+[{"title":"","series":"","format":"","logline":"one or two sentences","hook":"exactly what happens and is said in the first 3 seconds","beatsPreview":["3-5 short beats"],"whyOnBrand":"","visualDirection":"how it looks: which brand colours, typefaces, motion style and framing, and the cover frame","production":{"tier":"lean | moderate | heavy","needs":["people, location, props"]},"templateTieIn":"how a Videobolt template shows up, or empty"}]`;
 }
 
 // ================= V5 SCRIPTS =================
@@ -805,7 +966,7 @@ function paintScriptEditor() {
       <dl class="kv"><dt>Read time</dt><dd>${d.stages?.script ? `${rt.label} at ${wpm()} wpm · ${rt.words} words${rt.spokenOnly ? ' spoken' : ''}` : '—'}</dd>
       ${STAGES.map(([k, l]) => `<dt>${l}</dt><dd>${d.done?.[k] ? '<span class="chip ok">Approved</span>' : d.stages?.[k] ? '<span class="chip warn">Draft</span>' : '<span class="chip">Empty</span>'}</dd>`).join('')}</dl>
       <div class="actions" style="margin-top:14px"><button class="btn primary" id="ex-prompter" ${d.stages?.script ? '' : 'disabled'}>Open teleprompter</button><button class="btn" id="ex-copy">Copy package</button>${DL ? `<button class="btn" id="ex-dl">Download .md</button><button class="btn" id="ex-dl-tp" ${d.stages?.script ? '' : 'disabled'}>Download teleprompter .txt</button>` : ''}</div></div>
-      <div class="panel"><h2>Brand check</h2><p class="hint">Reads the script against the brand bible and flags lines that drift.</p><div id="bc-out">${checkHtml(d.check)}</div>
+      <div class="panel"><h2>Brand check</h2><p class="hint">Reads the script and shot list against the voice and the visual identity, and flags what drifts.</p><div id="bc-out">${checkHtml(d.check)}</div>
       <div class="actions"><button class="btn" id="bc-run" ${d.stages?.script ? '' : 'disabled'}>${d.check ? 'Check again' : 'Check script'}</button></div></div></div>`;
   } else {
     const label = STAGES.find(s => s[0] === st)[1];
@@ -834,7 +995,7 @@ function paintScriptEditor() {
 function checkHtml(ch) {
   if (!ch) return '<p class="hint">Not checked yet.</p>';
   return `<div class="actions"><strong style="font-family:var(--f-display);font-size:24px">${esc(ch.score)}</strong><span class="tc">/ 100</span><span class="spacer"></span><span class="tc">${fmtDate(ch.at)}</span></div><p>${esc(ch.verdict || '')}</p>
-    ${list(ch.issues).length ? `<div class="list" style="margin-top:8px">${list(ch.issues).map(i => `<div class="item"><p style="color:var(--ink)">“${esc(i.quote)}”</p><p>${esc(i.problem)}</p><p><strong>Try:</strong> ${esc(i.fix)}</p></div>`).join('')}</div>` : ''}
+    ${list(ch.issues).length ? `<div class="list" style="margin-top:8px">${list(ch.issues).map(i => `<div class="item">${i.area ? `<div class="meta"><span class="chip ${/look/i.test(i.area) ? 'accent' : ''}">${esc(i.area)}</span></div>` : ''}<p style="color:var(--ink)">“${esc(i.quote)}”</p><p>${esc(i.problem)}</p><p><strong>Try:</strong> ${esc(i.fix)}</p></div>`).join('')}</div>` : ''}
     ${list(ch.strengths).length ? `<p style="margin-top:8px"><strong>Working:</strong> ${list(ch.strengths).map(esc).join('; ')}</p>` : ''}`;
 }
 function stagePrompt(st, c, d, dir) {
@@ -847,6 +1008,7 @@ Hook: ${c.hook}
 Beats preview: ${list(c.beatsPreview).join(' / ')}
 Production: ${c.production?.tier || ''} — ${list(c.production?.needs).join(', ')}
 Template tie-in: ${c.templateTieIn || 'none'}
+Look: ${c.visualDirection || 'follow the visual identity'}
 Team notes: ${c.notes || 'none'}`;
   const prev = k => d.stages?.[k] ? `\n\nAPPROVED ${k.toUpperCase()}:\n${d.stages[k]}` : '';
   const current = d.stages?.[st] ? `\n\nCURRENT DRAFT OF THIS STAGE (rewrite it, keep what works):\n${d.stages[st]}` : '';
@@ -858,11 +1020,12 @@ Team notes: ${c.notes || 'none'}`;
 VISUAL: what we see
 ON-SCREEN: text on screen, or "—"
 VO: spoken voice-over line   (or ON CAMERA: for lines said to camera; ON CAMERA (Name): for another person)
-Keep spoken lines tight; the speaking pace is ${wpm()} words per minute. Plain text, no preamble.`,
+Keep spoken lines tight; the speaking pace is ${wpm()} words per minute.
+Write VISUAL and ON-SCREEN lines in our visual identity: name brand colours and typefaces, follow the motion style, the on-screen text and caption rules, and the logo rules (including the end card). Plain text, no preamble.`,
     shots: `Write the shot list for the shoot day from the script. One line per shot:
-#  | Shot | Framing / lens | Location | Props | Notes
-Group shots by location to save setup time. Then add a short "Props and prep" checklist. Plain text, no preamble.`,
-    captions: `Write the publishing copy. For each platform this video goes to (and for each of our accounts or personas if relevant), give the caption in that account's voice, a first line that works before "more", 3–8 hashtags that fit, and the character count. For YouTube, include a title and a description with chapters. Respect platform character limits. Plain text with a header per platform/account, no preamble.`,
+#  | Shot | Framing / lens | Location | Props | Look (light, grade, wardrobe, set colours) | Notes
+Group shots by location to save setup time. Lighting, grade, wardrobe and set dressing must follow the visual identity; list brand graphics or logo plates needed in post. Then add a short "Props and prep" checklist. Plain text, no preamble.`,
+    captions: `Write the publishing copy. For each platform this video goes to (and for each of our accounts or personas if relevant), give the caption in that account's voice, a first line that works before "more", 3–8 hashtags that fit, and the character count. For YouTube, include a title and a description with chapters. For each platform, also describe the cover frame or thumbnail in our visual identity (colours, typeface, text on it, logo placement). Respect platform character limits. Plain text with a header per platform/account, no preamble.`,
   }[st];
   return `${brandContext(1600)}\n\n${ctx}${st !== 'beats' ? prev('beats') : ''}${st === 'shots' || st === 'captions' ? prev('script') : ''}${current}${direction}\n\nTASK: ${task}`;
 }
@@ -912,6 +1075,30 @@ document.addEventListener('click', async e => {
     UI.bibleDirty = false; await store.putBible(b); UI.bibleDraft = null; toast('Brand bible saved'); render(); return; }
   if (t.id === 'b-revert') { UI.bibleDirty = false; UI.bibleDraft = null; render(); return; }
 
+  if (t.id === 'lk-imp-run') {
+    const text = $('#lk-imp-text').value.trim(); const imgs = UI.lookImport || [];
+    if (!text && !imgs.length) { $('#lk-imp-msg').innerHTML = '<p class="err">Add brand guide screenshots or paste its text.</p>'; return; }
+    $('#lk-imp-msg').innerHTML = '';
+    await busy(t, 'Reading…', async () => {
+      try {
+        const g = await ask(`TASK: ${imgs.length ? `The ${imgs.length} attached image${imgs.length > 1 ? 's are pages' : ' is a page'} from Videobolt's brand guide.` : ''}${text ? ' Below is text from the brand guide.' : ''} Extract the visual identity. Report only what the material states or clearly shows, and leave a field empty when it doesn't. Read printed hex values exactly; if a colour is only shown as a swatch, estimate its hex and write "(estimated)" in its usage.\n\n${text ? 'BRAND GUIDE TEXT:\n' + text.slice(0, 30000) + '\n\n' : ''}Reply with only JSON: {"colors":[{"name":"","hex":"#RRGGBB","role":"primary | secondary | accent | background | text | highlight | other","usage":""}],"type":[{"role":"headline | subhead | body | on-screen text | captions | logo wordmark | other","font":"","style":"weights, case, tracking","usage":""}],"logo":"","motion":"","text":"","camera":"","graphics":"","sound":"","dos":"","donts":""}`, { json: true, images: imgs });
+        const b = draft(); const filled = [], kept = [];
+        const role = (r, opts) => { const x = String(r || '').toLowerCase().trim(); return opts.includes(x) ? x : opts.find(o => x.includes(o)) || 'other'; };
+        const cs = list(b.lookColors); let nc = 0;
+        for (const c of list(g.colors)) { const h = validHex(c?.hex); if (!h || cs.some(x => validHex(x.hex) === h)) continue; cs.push({ hex: h, name: c.name || '', role: role(c.role, COLOR_ROLES), usage: c.usage || '' }); nc++; }
+        b.lookColors = cs; if (nc) filled.push(`${nc} colour${nc > 1 ? 's' : ''}`);
+        const ts = list(b.lookType); let nt = 0;
+        for (const x of list(g.type)) { if (!x?.font || ts.some(y => String(y.font).toLowerCase() === String(x.font).toLowerCase() && y.role === role(x.role, TYPE_ROLES))) continue; ts.push({ role: role(x.role, TYPE_ROLES), font: x.font, style: x.style || '', usage: x.usage || '' }); nt++; }
+        b.lookType = ts; if (nt) filled.push(`${nt} typeface${nt > 1 ? 's' : ''}`);
+        const map = { logo: 'lookLogo', motion: 'lookMotion', text: 'lookText', camera: 'lookCamera', graphics: 'lookGraphics', sound: 'lookSound', dos: 'lookDos', donts: 'lookDonts' };
+        for (const [gk, bk] of Object.entries(map)) { const v = String(g[gk] || '').trim(); if (!v) continue; const label = LOOK_FIELDS.find(f => f[0] === bk)[1]; if (b[bk]?.trim()) kept.push(label); else { b[bk] = v; filled.push(label); } }
+        UI.lookImport = []; UI.bibleDirty = true; render();
+        $('#lk-imp-msg').innerHTML = `<div class="note">${filled.length ? 'Filled in: ' + esc(filled.join(', ')) + '.' : 'Nothing new found.'}${kept.length ? ' Kept what you already had for: ' + esc(kept.join(', ')) + '.' : ''} Review below, then save.</div>`;
+      } catch (err) { $('#lk-imp-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; }
+    });
+    return;
+  }
+
   // teardowns
   if (t.id === 'td-run' || t.id === 'td-save-only') {
     const f = readTdForm();
@@ -929,7 +1116,7 @@ document.addEventListener('click', async e => {
       try { const a = await ask(tdPrompt(td), { json: true }); td.analysis = a; await store.put('teardowns', td.id, td); await savePatterns(a, td); openTeardown(td.id); }
       catch (err) { $('#dr-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; } }); return; }
   if (ds.adapt) { const [id, i] = ds.adapt.split(':'); const td = get('teardowns', id); const x = list(td?.analysis?.adaptations)[+i]; if (!x) return;
-    UI.genSeed = { label: `Adaptation of ${td.creator || 'a reference video'}: ${x.title}`, text: `Adapt this idea from a teardown of ${td.creator || 'a reference video'} (${td.link || ''}). Transferable principle: ${td.analysis?.whyItWorked?.transferable || ''}. Adaptation: ${x.title}: ${x.logline} Hook: ${x.hook}` };
+    UI.genSeed = { label: `Adaptation of ${td.creator || 'a reference video'}: ${x.title}`, text: `Adapt this idea from a teardown of ${td.creator || 'a reference video'} (${td.link || ''}). Transferable principle: ${td.analysis?.whyItWorked?.transferable || ''}. Adaptation: ${x.title}: ${x.logline} Hook: ${x.hook}${x.look ? ' Look: ' + x.look : ''}` };
     closeDrawer(); UI.sub.concepts = 'gen'; go('concepts'); return; }
   if (ds.usePattern) { const p = get('patterns', ds.usePattern); UI.genSeed = { label: `Pattern: ${p.name}`, text: `Use the ${p.kind} pattern "${p.name}": ${p.description}`, patternId: p.id }; UI.sub.concepts = 'gen'; go('concepts'); return; }
   if (t.id === 'pt-add') { const name = $('#pt-name').value.trim(); if (!name) { toast('Give the pattern a name.'); return; }
@@ -987,7 +1174,8 @@ document.addEventListener('click', async e => {
     $('#cg-msg').innerHTML = '';
     await busy(t, 'Thinking… (up to a minute)', async () => {
       try {
-        const arr = list(await ask(conceptPrompt(f), { json: true }));
+        const L = await withLook(conceptPrompt(f));
+        const arr = list(await ask(L.prompt, { json: true, images: L.images }));
         UI.genResults = arr.filter(c => c && c.title).map(c => ({ ...c, series: c.series || (f.series !== '__new' ? f.series : ''), platform: f.platform, goal: f.goal, persona: f.persona, _k: uid(),
           source: UI.genSeed ? { type: 'seed', label: UI.genSeed.label } : f.patternId ? { type: 'pattern', id: f.patternId } : { type: 'generator' } }));
         PAINT.concepts();
@@ -1016,7 +1204,9 @@ document.addEventListener('click', async e => {
       try {
         if (!SAMPLE) throw { code: 'unavailable', message: 'Generation is not available in this view.' };
         box.value = 'Thinking…';
-        const r = await SAMPLE(stagePrompt(st, c, d, $('#sc-dir').value.trim()), { cache: false, signal: ctl.signal, onText: ({ text }) => { box.value = text; } });
+        const L = st === 'beats' ? { prompt: stagePrompt(st, c, d, $('#sc-dir').value.trim()), images: [] } : await withLook(stagePrompt(st, c, d, $('#sc-dir').value.trim()));
+        const opts = { cache: false, signal: ctl.signal, onText: ({ text }) => { box.value = text; } }; if (L.images.length) opts.images = L.images;
+        const r = await SAMPLE(L.prompt, opts);
         box.value = r.text.trim(); await saveStage(); if (r.truncated) $('#sc-msg').innerHTML = '<p class="err">The answer was cut short. Ask for a shorter version in the direction box.</p>';
       } catch (err) { box.value = err?.text?.trim() || before; if (err?.code !== 'cancelled') $('#sc-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; else if (err?.text) await saveStage(); }
       finally { stop.hidden = true; generating = false; }
@@ -1027,7 +1217,8 @@ document.addEventListener('click', async e => {
     await store.put('scripts', d.id, d); if (d.done[UI.stage]) { const i = STAGES.findIndex(s => s[0] === UI.stage); UI.stage = STAGES[i + 1]?.[0] || 'export'; } paintScriptEditor(); return; }
   if (t.id === 'bc-run') { const c = get('concepts', UI.scriptId); const d = clone(scriptDoc(c.id));
     await busy(t, 'Checking…', async () => {
-      try { const ch = await ask(`${brandContext()}\n\nTASK: Check this script against the brand bible. Flag only real problems: words we avoid, off-voice lines, a weak or slow hook, unclear CTA, lines too long to say at ${wpm()} wpm, platform mismatches.\n\nSCRIPT:\n${d.stages.script}\n\nReply with only JSON: {"score":0-100,"verdict":"one or two sentences","issues":[{"quote":"exact line","problem":"","fix":"rewritten line"}],"strengths":["short"]}`, { json: true });
+      try { const L = await withLook(`${brandContext()}\n\nTASK: Check this script against the brand bible, for both voice and look. Flag only real problems. Voice: words we avoid, off-voice lines, a weak or slow hook, unclear CTA, lines too long to say at ${wpm()} wpm, platform mismatches. Look: VISUAL and ON-SCREEN lines that break the visual identity (wrong or unnamed colours, off-brand type, motion that doesn't match, on-screen text or caption rules broken, logo misuse, a missing end card).\n\nSCRIPT:\n${d.stages.script}${d.stages.shots ? '\n\nSHOT LIST:\n' + d.stages.shots.slice(0, 6000) : ''}\n\nReply with only JSON: {"score":0-100,"verdict":"one or two sentences","issues":[{"area":"voice | look","quote":"exact line","problem":"","fix":"rewritten line"}],"strengths":["short"]}`);
+        const ch = await ask(L.prompt, { json: true, images: L.images });
         d.check = { ...ch, at: now() }; await store.put('scripts', d.id, d); $('#bc-out').innerHTML = checkHtml(d.check); }
       catch (err) { $('#bc-out').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; } }); return; }
   if (t.id === 'ex-prompter') return openPrompter(prompterText(scriptDoc(UI.scriptId)));
@@ -1038,6 +1229,7 @@ document.addEventListener('click', async e => {
   // generic
   if (ds.del) { const [coll, id] = ds.del.split(':');
     if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; const old = t.textContent; t.textContent = 'Press again to delete'; setTimeout(() => { if (t.isConnected) { t.dataset.confirm = ''; t.textContent = old; } }, 3000); return; }
+    if (coll === 'brandImages') { const im = get('brandImages', id); if (im?.assetId && AS) AS.delete(im.assetId).catch(() => {}); }
     await store.del(coll, id); if (ds.close) closeDrawer(); toast('Deleted'); return; }
   if (ds.openTd) return openTeardown(ds.openTd);
   if (ds.openDg) return openDigest(ds.openDg);
@@ -1051,13 +1243,28 @@ document.addEventListener('mousedown', e => { if (e.target.id === 'scrim') close
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.bk) { draft()[el.dataset.bk] = el.value; markBibleDirty(); return; }
-  if (el.dataset.arr) { const b = draft(); const arr = list(b[el.dataset.arr]); arr[+el.dataset.i] = { ...arr[+el.dataset.i], [el.dataset.k]: el.value }; b[el.dataset.arr] = arr; markBibleDirty(); return; }
+  if (el.dataset.arr) { const b = draft(); const arr = list(b[el.dataset.arr]); const val = el.type === 'color' ? el.value.toUpperCase() : el.value; arr[+el.dataset.i] = { ...arr[+el.dataset.i], [el.dataset.k]: val }; b[el.dataset.arr] = arr;
+    if (el.dataset.k === 'hex') $$(`[data-arr="${el.dataset.arr}"][data-i="${el.dataset.i}"][data-k="hex"]`).forEach(o => { if (o !== el) { if (o.type === 'color') { const h = validHex(val); if (h) o.value = h; } else o.value = val; } });
+    markBibleDirty(); return; }
+  if (el.dataset.img && el.dataset.ik === 'caption') { clearTimeout(el._t); el._t = setTimeout(() => saveImg(el.dataset.img, { caption: el.value }), 800); return; }
   if (el.id === 'sc-text') { scheduleStageSave(); updateReadTime(); return; }
   if (el.dataset.cnote) { clearTimeout(el._t); el._t = setTimeout(() => { const c = get('concepts', el.dataset.cnote); if (c && c.notes !== el.value) store.put('concepts', c.id, { ...c, notes: el.value }); }, 900); }
 });
 document.addEventListener('change', async e => {
   const el = e.target;
   if (el.dataset.status) { const c = get('concepts', el.dataset.status); if (c) await store.put('concepts', c.id, { ...c, status: el.value }); return; }
+  if (el.dataset.img && el.dataset.ik === 'kind') { await saveImg(el.dataset.img, { kind: el.value }); return; }
+  if (el.dataset.img && el.dataset.ik === 'useInPrompts') {
+    if (el.checked && S.brandImages.filter(i => i.useInPrompts && i.id !== el.dataset.img).length >= 2) { el.checked = false; toast('Two images at most. Untick one first.'); return; }
+    await saveImg(el.dataset.img, { useInPrompts: el.checked }); return; }
+  if (el.id === 'lk-up-file') {
+    const files = [...el.files]; el.value = '';
+    for (const f of files) {
+      try { const r = await AS.upload(f); await store.put('brandImages', uid(), { assetId: r.id, caption: f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), kind: /logo/i.test(f.name) ? 'logo' : 'frame', useInPrompts: false }); }
+      catch (err) { toast(err?.code === 'quota_exceeded' ? 'Image storage is full. Delete some images first.' : `Could not upload ${f.name}.`); }
+    }
+    return; }
+  if (el.id === 'lk-imp-images') { UI.lookImport = [...el.files].slice(0, IMG?.maxCount || 4); $('#lk-imp-thumbs').innerHTML = UI.lookImport.map(f => `<img alt="" src="${URL.createObjectURL(f)}">`).join(''); return; }
   if (el.id === 'td-images' || el.id === 'wl-images') {
     const files = [...el.files].slice(0, IMG?.maxCount || 4);
     if (el.id === 'td-images') UI.tdImages = files; else UI.watchImages = files;
@@ -1078,6 +1285,7 @@ async function saveStage() {
 }
 function updateReadTime() { const el = $('#sc-rt'); const box = $('#sc-text'); if (UI.stage !== 'script' || !box) return; const rt = readTime(box.value);
   if (el) el.textContent = `${rt.label} read · ${rt.words} words`; }
+async function saveImg(id, patch) { const im = get('brandImages', id); if (im) await store.put('brandImages', id, { ...im, ...patch }); }
 function clearTdForm() { ['td-link','td-creator','td-followers','td-views','td-likes','td-comments','td-transcript','td-notes'].forEach(id => { const el = $('#' + id); if (el) el.value = ''; }); UI.tdImages = []; const th = $('#td-thumbs'); if (th) th.innerHTML = ''; const fi = $('#td-images'); if (fi) fi.value = ''; }
 function clearCompForm() { $$('#cp-form input, #cp-form textarea').forEach(el => el.value = ''); $('#cp-title').textContent = 'Add a competitor'; }
 window.addEventListener('beforeunload', () => { if (stageT) saveStage(); });
