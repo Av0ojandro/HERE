@@ -1,0 +1,1090 @@
+<title>Videobolt Content Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an edit-suite workspace. A track rail on the left (five tracks = five stages of the pipeline), a working canvas on the right. */
+:root{
+  --bg:#EEF0F4; --surface:#FFFFFF; --sunk:#E4E7EE; --ink:#14161D; --muted:#596074; --line:#D3D7E0;
+  --accent:#2B45D4; --accent-ink:#FFFFFF; --accent-soft:#E2E6FB;
+  --rec:#CF3229; --ok:#1C8550; --warn:#A86E12; --star:#D99A0B;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1016; --surface:#171A22; --sunk:#1E222C; --ink:#E7E9EF; --muted:#959BAC; --line:#2A2F3B;
+  --accent:#7D90FF; --accent-ink:#0E1016; --accent-soft:#222949;
+  --rec:#FF6A62; --ok:#4CC38A; --warn:#E2A748; --star:#F2B83A; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0E1016; --surface:#171A22; --sunk:#1E222C; --ink:#E7E9EF; --muted:#959BAC; --line:#2A2F3B;
+  --accent:#7D90FF; --accent-ink:#0E1016; --accent-soft:#222949;
+  --rec:#FF6A62; --ok:#4CC38A; --warn:#E2A748; --star:#F2B83A; color-scheme:dark;}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100%}
+.rail{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:18px;position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow:auto}
+.brand{font-family:var(--f-display);font-weight:800;font-stretch:118%;font-size:19px;letter-spacing:-.01em;line-height:1.1;padding-inline:8px}
+.brand small{display:block;font:500 11px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px;font-stretch:100%}
+.tracks{display:flex;flex-direction:column;gap:2px}
+.track{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;padding:9px 8px;border-radius:var(--r);border:0;background:none;text-align:left;cursor:pointer;color:var(--ink)}
+.track:hover{background:var(--sunk)}
+.track[aria-current="true"]{background:var(--accent-soft)}
+.track .tid{font:500 11px/1 var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:4px 0;text-align:center;background:var(--bg)}
+.track[aria-current="true"] .tid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.track .tname{font-weight:600;font-size:14px}
+.track .tsub{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.track .tcount{font:500 11px/1 var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.status{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:10px 8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
+.dot.on{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.rec{background:var(--rec)}
+
+main{padding-inline:clamp(16px,3.5vw,44px);padding-block:28px 80px;min-width:0}
+.vhead{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px;margin-bottom:22px}
+.vhead h1{font-family:var(--f-display);font-weight:780;font-stretch:112%;font-size:clamp(26px,3.2vw,36px);line-height:1.05;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.vhead p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+.subtabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--sunk);padding:3px;border-radius:8px}
+.subtabs button{border:0;background:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+.subtabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+.cols{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
+.cols.even{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.panel h2{font-family:var(--f-display);font-stretch:108%;font-weight:700;font-size:17px;margin:0 0 4px;letter-spacing:-.005em}
+.panel .hint{color:var(--muted);font-size:13px;margin:0 0 14px}
+.form{display:flex;flex-direction:column;gap:12px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.01em;min-width:0}
+label.f span.opt{font-weight:400}
+input[type=text],input[type=url],input[type=number],input[type=date],select,textarea{width:100%;font-weight:400;letter-spacing:0;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:14px;color:var(--ink);min-width:0}
+textarea{resize:vertical;min-height:72px;line-height:1.5}
+textarea.tall{min-height:180px}
+textarea.code{font-family:var(--f-mono);font-size:13px;min-height:320px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:var(--r);cursor:pointer;font-size:14px;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn.ghost{border-color:transparent;background:none}
+.btn.danger{color:var(--rec)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.actions .spacer{flex:1}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.item.click{cursor:pointer}
+.item.click:hover{border-color:var(--muted)}
+.item h3{font-size:15px;font-weight:600;margin:0;line-height:1.35}
+.item p{margin:0;font-size:14px;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:4px;font:500 11px/1 var(--f-mono);letter-spacing:.03em;padding:4px 7px;border-radius:4px;background:var(--sunk);color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.chip.accent{background:var(--accent-soft);color:var(--accent)}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)} .chip.rec{color:var(--rec)}
+.chip.ignore{color:var(--muted)} .chip.counter{color:var(--rec)} .chip.borrow{color:var(--ok)}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+
+.empty{border:1.5px dashed var(--line);border-radius:10px;padding:22px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:8px}
+.empty strong{color:var(--ink);font-weight:600}
+.note{background:var(--accent-soft);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--ink)}
+.out{white-space:pre-wrap;font-size:14px}
+.err{color:var(--rec);font-size:13px}
+
+.stars{display:inline-flex;gap:1px}
+.stars button{border:0;background:none;padding:0 1px;cursor:pointer;font-size:16px;line-height:1;color:var(--line)}
+.stars button.on{color:var(--star)}
+
+/* keyframe stage rail for scripts: each diamond is one stage, filled when approved */
+.kf{display:flex;align-items:center;gap:0;margin:4px 0 16px;overflow-x:auto}
+.kf button{display:flex;align-items:center;gap:8px;border:0;background:none;cursor:pointer;padding:6px 10px 6px 0;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap}
+.kf button .dia{width:11px;height:11px;transform:rotate(45deg);border:1.5px solid var(--muted);background:transparent;flex:none}
+.kf button.done .dia{background:var(--ok);border-color:var(--ok)}
+.kf button.cur{color:var(--ink)}
+.kf button.cur .dia{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.kf .wire{flex:1;min-width:16px;height:1.5px;background:var(--line);margin-right:10px}
+
+.tc{font:500 12px/1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;font-size:14px}
+.kv dt{font:500 11px/1.9 var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.kv dd{margin:0;min-width:0}
+.sec{display:flex;flex-direction:column;gap:6px;padding-block:12px;border-top:1px solid var(--line)}
+.sec:first-child{border-top:0;padding-top:0}
+.sec h4{margin:0;font:500 11px/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.sec ol,.sec ul{margin:0;padding-left:20px}
+.meter{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.checks{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.checks .ok{color:var(--ok)} .checks .no{color:var(--muted)}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}
+.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:4px;border:1px solid var(--line)}
+.rowedit{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.rowedit .fields{display:flex;flex-direction:column;gap:6px;min-width:0}
+
+.savebar{position:sticky;bottom:0;margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 -4px 18px rgba(0,0,0,.06)}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,12,18,.42);z-index:40;display:flex;justify-content:flex-end}
+.drawer{background:var(--surface);width:min(720px,100%);height:100%;overflow:auto;padding:calc(22px + env(safe-area-inset-top,0px)) clamp(16px,3vw,28px) calc(40px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;border-left:1px solid var(--line)}
+.drawer h2{font-family:var(--f-display);font-stretch:110%;font-size:22px;margin:0;line-height:1.15;text-wrap:balance}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
+
+/* teleprompter */
+.prompter{position:fixed;inset:0;background:#000;color:#fff;z-index:70;display:flex;flex-direction:column}
+.prompter .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:#111;font-size:13px}
+.prompter .bar button{background:#222;color:#fff;border:1px solid #333;border-radius:6px;padding:6px 12px;cursor:pointer}
+.prompter .bar label{display:flex;gap:6px;align-items:center;color:#bbb}
+.prompter .scroll{flex:1;overflow:hidden;position:relative}
+.prompter .text{padding:40vh 8vw 80vh;font:600 var(--psize,44px)/1.4 var(--f-body);white-space:pre-wrap;will-change:transform}
+.prompter .text.mirror{transform:scaleX(-1)}
+.prompter .guide{position:absolute;left:0;right:0;top:38vh;height:2px;background:rgba(255,80,70,.6);pointer-events:none}
+
+@media (max-width:980px){.cols,.cols.even{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .rail{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:20;flex-direction:row;align-items:center;padding:10px 16px;gap:12px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .brand small,.status,.track .tsub,.track .tcount{display:none}
+  .brand{font-size:15px;padding:0;white-space:nowrap}
+  .tracks{flex-direction:row}
+  .track{grid-template-columns:auto auto;padding:7px 8px}
+  .track .tid{width:30px}
+  .track .tname{font-size:13px;white-space:nowrap}
+}
+</style>
+
+<div class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="brand">Videobolt<br>Content Lab<small>Concept → script</small></div>
+    <div class="tracks" id="tracks"></div>
+    <div class="status" id="status">
+      <div><span class="dot" id="st-db"></span><span id="st-db-t">Connecting…</span></div>
+      <div><span class="dot" id="st-ai"></span><span id="st-ai-t">Checking generation…</span></div>
+    </div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div id="layer"></div>
+
+<script>
+(() => {
+'use strict';
+// ---------- helpers ----------
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const now = () => new Date().toISOString();
+const clone = o => JSON.parse(JSON.stringify(o ?? null));
+const byNew = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+const fmtDate = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}); };
+const num = v => { const n = Number(String(v ?? '').replace(/[, ]/g, '').replace(/k$/i, '000').replace(/m$/i, '000000')); return isFinite(n) && n > 0 ? n : 0; };
+const short = n => n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? (n/1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n || 0);
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const list = v => Array.isArray(v) ? v : (v ? [v] : []);
+
+let toastT;
+function toast(msg) {
+  let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600);
+}
+
+// ---------- state ----------
+const COLLS = ['teardowns','patterns','competitors','watch','digests','shifts','concepts','scripts'];
+const S = { bible: {}, teardowns: [], patterns: [], competitors: [], watch: [], digests: [], shifts: [], concepts: [], scripts: [] };
+const UI = {
+  view: (lsGet('vbl-view') || 'bible'), sub: lsGet('vbl-sub') || {},
+  genResults: [], genSeed: null, scriptId: lsGet('vbl-script') || null, stage: 'beats',
+  tdImages: [], watchImages: [], bibleDraft: null, bibleDirty: false, patFilter: 'all', boardFilter: 'all',
+};
+const VIEWS = [
+  {id:'bible', tid:'V1', name:'Brand bible', sub:'Voice, series, personas'},
+  {id:'teardown', tid:'V2', name:'Teardowns', sub:'Reference videos, patterns'},
+  {id:'watch', tid:'V3', name:'Market watch', sub:'Competitors, digests'},
+  {id:'concepts', tid:'V4', name:'Concepts', sub:'Generate, rate, shortlist'},
+  {id:'scripts', tid:'V5', name:'Scripts', sub:'Beats to captions'},
+];
+if (!VIEWS.some(v => v.id === UI.view)) UI.view = 'bible';
+const hashView = location.hash.replace('#', ''); if (VIEWS.some(v => v.id === hashView)) UI.view = hashView;
+
+// ---------- storage: shared db with local fallback ----------
+const LKEY = 'vbl-local-v1';
+const store = {
+  mode: 'loading', db: null, chains: {},
+  async init() {
+    let db = null;
+    try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
+    if (db) {
+      this.mode = 'shared'; this.db = db;
+      db.doc('brand/bible').onSnapshot(d => { S.bible = d.exists ? clone(d.data()) : {}; onData('bible'); }, e => this.fail(e));
+      for (const c of COLLS) db.collection(c).onSnapshot(snap => { S[c] = snap.docs.map(d => ({ ...clone(d.data()), id: d.id })).sort(byNew); onData(c); }, e => this.fail(e));
+    } else {
+      this.mode = 'local';
+      const saved = lsGet(LKEY) || {};
+      S.bible = saved.bible || {};
+      for (const c of COLLS) S[c] = (saved[c] || []).sort(byNew);
+      onData('*');
+    }
+    paintStatus();
+  },
+  fail(e) { if (e?.code === 'revoked') { this.mode = 'readonly'; paintStatus(); } },
+  persistLocal() { const o = { bible: S.bible }; for (const c of COLLS) o[c] = S[c]; lsSet(LKEY, o); },
+  // one write at a time per document; later writes for the same doc coalesce
+  write(key, fn) {
+    const ch = this.chains[key] || (this.chains[key] = { running: null, next: null });
+    ch.next = fn;
+    if (!ch.running) {
+      const run = async () => { const f = ch.next; ch.next = null; try { await f(); } catch (e) { handleWriteError(e); } if (ch.next) return run(); ch.running = null; };
+      ch.running = run();
+    }
+    return ch.running;
+  },
+  put(coll, id, data) {
+    const body = { ...clone(data), id, updatedAt: now() }; if (!body.createdAt) body.createdAt = now();
+    if (this.mode === 'shared') return this.write(coll + '/' + id, () => this.db.collection(coll).doc(id).set(body));
+    const arr = S[coll]; const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = body; else arr.unshift(body);
+    arr.sort(byNew); this.persistLocal(); onData(coll); return Promise.resolve();
+  },
+  del(coll, id) {
+    if (this.mode === 'shared') return this.write(coll + '/' + id, () => this.db.collection(coll).doc(id).delete());
+    S[coll] = S[coll].filter(x => x.id !== id); this.persistLocal(); onData(coll); return Promise.resolve();
+  },
+  putBible(data) {
+    const body = { ...clone(data), updatedAt: now() };
+    if (this.mode === 'shared') return this.write('brand/bible', () => this.db.doc('brand/bible').set(body));
+    S.bible = body; this.persistLocal(); onData('bible'); return Promise.resolve();
+  },
+};
+function handleWriteError(e) {
+  if (e?.code === 'invalid_argument') { toast('You have view-only access, so changes are not saved.'); }
+  else if (e?.code === 'quota_exceeded') toast('Storage is full. Delete old teardowns or logs to make room.');
+  else toast('Could not save. Check your connection and try again.');
+}
+const get = (coll, id) => S[coll].find(x => x.id === id);
+
+// ---------- Claude in the page ----------
+let SAMPLE = null, IMG = null, DL = null;
+async function initSample() {
+  try { SAMPLE = window.claude?.use ? await window.claude.use('sample') : null; } catch { SAMPLE = null; }
+  if (SAMPLE) { try { IMG = (await SAMPLE.limits())?.images || null; } catch { IMG = null; } }
+  try { DL = window.claude?.use ? await window.claude.use('downloads') : null; } catch { DL = null; }
+  paintStatus(); render();
+}
+async function ask(prompt, { json = false, images, onText, tier } = {}) {
+  if (!SAMPLE) throw { code: 'unavailable', message: 'Generation is not available in this view. Open the page on claude.ai while signed in.' };
+  const opts = { cache: false };
+  if (images && images.length && IMG) opts.images = images.slice(0, IMG.maxCount || 4);
+  if (onText) opts.onText = onText;
+  if (tier) opts.modelTier = tier;
+  return json ? SAMPLE.json(prompt, opts) : (await SAMPLE(prompt, opts)).text;
+}
+function errCopy(e) {
+  switch (e?.code) {
+    case 'not_granted': return 'Generation was declined for this page. Reload the page and allow it to use Claude.';
+    case 'rate_limited': return 'Too many requests in a row. Wait a minute, then try again.';
+    case 'invalid_json': return 'The answer came back in an unexpected shape. Try again.';
+    case 'prompt_too_large': return 'Too much text to send at once. Shorten the transcript or the reference scripts.';
+    case 'image_rejected': return 'One of the screenshots could not be read. Use JPEG, PNG or WebP.';
+    case 'cancelled': return 'Stopped.';
+    default: return e?.message || 'Something went wrong. Try again.';
+  }
+}
+async function busy(btn, label, fn) {
+  const old = btn.innerHTML; btn.disabled = true; btn.textContent = label;
+  try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = old; }
+}
+
+// ---------- brand context (fed to every prompt) ----------
+const BIBLE_FIELDS = [
+  ['about', 'What Videobolt is'], ['voice', 'Voice and tone'], ['use', 'Words and phrases we use'], ['avoid', 'Words and phrases we avoid'],
+  ['audiences', 'Audiences'], ['pillars', 'Content pillars'], ['ctas', 'Calls to action'], ['platforms', 'Platforms and specs'],
+];
+function brandContext(limit = 2400) {
+  const b = S.bible || {};
+  const out = ['BRAND BIBLE: VIDEOBOLT'];
+  for (const [k, label] of BIBLE_FIELDS) if (b[k]?.trim()) out.push(`${label}:\n${b[k].trim()}`);
+  const series = list(b.series).filter(s => s.name);
+  if (series.length) out.push('Series and formats:\n' + series.map(s => `- ${s.name}${s.desc ? ': ' + s.desc : ''}`).join('\n'));
+  const per = list(b.personas).filter(p => p.name);
+  if (per.length) out.push('Accounts and personas:\n' + per.map(p => `- ${p.name}${p.handle ? ' (' + p.handle + ')' : ''}${p.desc ? ': ' + p.desc : ''}`).join('\n'));
+  const refs = list(b.refs).filter(r => r.text);
+  if (refs.length) out.push('Reference scripts we consider on-brand (match this voice):\n' + refs.slice(0, 4).map(r => `### ${r.title || 'Untitled'}\n${r.text.slice(0, limit)}`).join('\n\n'));
+  if (out.length === 1) out.push('(The brand bible is mostly empty. Write in a clear, confident, creator-friendly voice for a motion graphics and video template company, and say in whyOnBrand fields that the bible needs filling in.)');
+  return out.join('\n\n');
+}
+const wpm = () => num(S.bible?.wpm) || 150;
+
+// ---------- shell ----------
+const VIEWS_RENDER = {}, PAINT = {};
+let generating = false;
+function paintTracks() {
+  const counts = { bible: bibleScore().pct + '%', teardown: S.teardowns.length, watch: S.watch.length, concepts: S.concepts.length, scripts: S.scripts.length };
+  $('#tracks').innerHTML = VIEWS.map(v => `<button class="track" data-view="${v.id}" aria-current="${UI.view === v.id}">
+    <span class="tid">${v.tid}</span><span class="tname">${v.name}<span class="tsub">${v.sub}</span></span><span class="tcount">${counts[v.id]}</span></button>`).join('');
+}
+function paintStatus() {
+  const d = $('#st-db'), dt = $('#st-db-t'), a = $('#st-ai'), at = $('#st-ai-t');
+  d.className = 'dot ' + (store.mode === 'shared' ? 'on' : store.mode === 'loading' ? '' : 'warn');
+  dt.textContent = store.mode === 'shared' ? 'Shared with everyone who opens this page' : store.mode === 'local' ? 'Saved in this browser only' : store.mode === 'readonly' ? 'Read-only' : 'Connecting…';
+  a.className = 'dot ' + (SAMPLE ? 'on' : 'warn');
+  at.textContent = SAMPLE ? 'Generation on' + (IMG ? ' · reads screenshots' : '') : 'Generation unavailable here';
+}
+function go(view) {
+  if (UI.view === 'bible' && view !== 'bible' && UI.bibleDirty) toast('Brand bible changes are unsaved. They stay here until you save or reload.');
+  UI.view = view; lsSet('vbl-view', view);
+  try { history.replaceState(null, '', '#' + view); } catch {}
+  render(); $('#main').focus({ preventScroll: true }); window.scrollTo(0, 0);
+}
+function sub(view, def) { return UI.sub[view] || def; }
+function setSub(view, s) { UI.sub[view] = s; lsSet('vbl-sub', UI.sub); render(); }
+function subtabs(view, tabs, def) {
+  const cur = sub(view, def);
+  return `<div class="subtabs" role="group">${tabs.map(([id, label]) => `<button data-sub="${view}:${id}" aria-pressed="${cur === id}">${label}</button>`).join('')}</div>`;
+}
+
+function render() {
+  paintTracks();
+  const m = $('#main');
+  m.innerHTML = VIEWS_RENDER[UI.view]();
+  PAINT[UI.view]?.();
+}
+// data change → repaint only the live regions of the current view so forms keep their input
+function onData(what) {
+  paintTracks();
+  if (what === 'bible' || what === '*') { if (UI.view === 'bible' && !UI.bibleDirty) { UI.bibleDraft = null; render(); return; } }
+  if (store.mode !== 'loading' && $('#main').children.length === 0) { render(); return; }
+  PAINT[UI.view]?.(what);
+}
+
+// ================= V1 BRAND BIBLE =================
+function bibleScore(b = S.bible || {}) {
+  const checks = [
+    ['Voice and tone', !!b.voice?.trim()], ['Words to use and avoid', !!(b.use?.trim() && b.avoid?.trim())],
+    ['Audiences', !!b.audiences?.trim()], ['Content pillars', !!b.pillars?.trim()],
+    ['At least two series or formats', list(b.series).filter(s => s.name).length >= 2],
+    ['Account personas', list(b.personas).filter(p => p.name).length >= 1],
+    ['Calls to action', !!b.ctas?.trim()], ['Two or more reference scripts', list(b.refs).filter(r => r.text?.trim()).length >= 2],
+  ];
+  return { checks, pct: Math.round(100 * checks.filter(c => c[1]).length / checks.length) };
+}
+function draft() { if (!UI.bibleDraft) UI.bibleDraft = clone(S.bible || {}) || {}; return UI.bibleDraft; }
+const VIEWS_RENDER_ = VIEWS_RENDER;
+VIEWS_RENDER_.bible = () => {
+  const b = draft();
+  const ta = (k, label, ph, cls = '') => `<label class="f">${label}<textarea id="b-${k}" data-bk="${k}" class="${cls}" placeholder="${esc(ph)}">${esc(b[k] || '')}</textarea></label>`;
+  return `
+  <div class="vhead"><div><div class="eyebrow">V1 · Set once, edit any time</div><h1>Brand bible</h1>
+    <p>Every concept, teardown and script reads from this page. The more specific it is, the more the output sounds like Videobolt.</p></div></div>
+  <div class="cols">
+    <div class="stack">
+      <div class="panel"><h2>Readiness</h2><p class="hint">What the generator still needs from you.</p><div id="b-score"></div></div>
+      <div class="panel form">
+        <h2>Voice</h2>
+        ${ta('about', 'What Videobolt is', 'One or two lines: what we make, who it is for, what makes it different.')}
+        ${ta('voice', 'Voice and tone', 'e.g. Talks like a working editor, not a marketer. Short sentences. Dry humour allowed. Never condescending about skill level.', 'tall')}
+        <div class="row">${ta('use', 'Words we use', 'templates, drag-and-drop, render, …')}${ta('avoid', 'Words we avoid', 'game-changer, unleash, elevate, …')}</div>
+        ${ta('audiences', 'Audiences', 'Who we talk to, and what each one wants from a video.')}
+        ${ta('pillars', 'Content pillars', 'The 3–5 themes we keep coming back to.')}
+        ${ta('ctas', 'Calls to action', 'What we ask people to do, and how we phrase it.')}
+        ${ta('platforms', 'Platforms and specs', 'e.g. Reels 9:16 up to 90s, YouTube 16:9, Shorts, TikTok, Google Business posts…')}
+        <label class="f">Speaking pace (words per minute) <input type="number" id="b-wpm" data-bk="wpm" min="80" max="260" value="${esc(b.wpm || 150)}"></label>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel"><h2>Series and formats</h2><p class="hint">Recurring shows and formats the generator can pick from.</p>
+        <div class="list" id="b-series"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="series">Add series</button></div></div>
+      <div class="panel"><h2>Accounts and personas</h2><p class="hint">Each account voice, so concepts and captions can be written for a specific one.</p>
+        <div class="list" id="b-personas"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="personas">Add persona</button></div></div>
+      <div class="panel"><h2>Reference scripts</h2><p class="hint">Scripts you're proud of. These carry the voice better than any rule.</p>
+        <div class="list" id="b-refs"></div><div class="actions" style="margin-top:10px"><button class="btn small" data-add="refs">Add script</button></div></div>
+    </div>
+  </div>
+  <div class="savebar"><span id="b-state" class="tc">${UI.bibleDirty ? 'Unsaved changes' : (S.bible?.updatedAt ? 'Saved ' + fmtDate(S.bible.updatedAt) : 'Not saved yet')}</span>
+    <div class="actions"><button class="btn ghost" id="b-revert" ${UI.bibleDirty ? '' : 'disabled'}>Discard changes</button><button class="btn primary" id="b-save">Save brand bible</button></div></div>`;
+};
+const ARR = {
+  series: { fields: [['name', 'Name', 'e.g. Designer’s Picks'], ['desc', 'What it is', 'Format, length, structure, cadence', true]] },
+  personas: { fields: [['name', 'Persona', 'e.g. The Curator'], ['handle', 'Account', '@handle'], ['desc', 'How they talk', 'Voice, angle, what they post', true]] },
+  refs: { fields: [['title', 'Title', 'Script title'], ['text', 'Script', 'Paste the full script', true]] },
+};
+function paintBibleArrays() {
+  const b = draft();
+  for (const k of Object.keys(ARR)) {
+    const el = $('#b-' + k); if (!el) continue;
+    const arr = list(b[k]);
+    el.innerHTML = arr.length ? arr.map((it, i) => `<div class="rowedit"><div class="fields">${ARR[k].fields.map(([f, label, ph, big]) =>
+      big ? `<textarea data-arr="${k}" data-i="${i}" data-k="${f}" aria-label="${label}" placeholder="${esc(ph)}" class="${k === 'refs' ? 'tall' : ''}">${esc(it[f] || '')}</textarea>`
+          : `<input type="text" data-arr="${k}" data-i="${i}" data-k="${f}" aria-label="${label}" placeholder="${esc(ph)}" value="${esc(it[f] || '')}">`).join('')}</div>
+      <button class="btn small ghost danger" data-rm="${k}:${i}" aria-label="Remove">Remove</button></div>`).join('')
+      : `<div class="empty">Nothing here yet.</div>`;
+  }
+}
+function paintBibleScore() {
+  const { checks, pct } = bibleScore(draft());
+  const el = $('#b-score'); if (!el) return;
+  el.innerHTML = `<div class="actions" style="margin-bottom:8px"><strong style="font-family:var(--f-display);font-size:24px;font-stretch:110%">${pct}%</strong><span class="spacer"></span><span class="tc">${checks.filter(c => c[1]).length}/${checks.length}</span></div>
+    <div class="meter"><i style="width:${pct}%"></i></div><div class="checks" style="margin-top:10px">${checks.map(([l, ok]) => `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '○'} ${l}</div>`).join('')}</div>`;
+}
+function markBibleDirty() {
+  UI.bibleDirty = true; const s = $('#b-state'); if (s) s.textContent = 'Unsaved changes';
+  const r = $('#b-revert'); if (r) r.disabled = false; paintBibleScore();
+}
+PAINT.bible = (what) => { if (!what || what === '*') { paintBibleArrays(); paintBibleScore(); } };
+
+// ================= V2 TEARDOWNS & PATTERNS =================
+function outlier(t) {
+  const v = num(t.views), f = num(t.followers);
+  if (!v || !f) return null;
+  const r = v / f;
+  return { r, label: r >= 3 ? 'Outlier' : r >= 1 ? 'Above reach' : 'Typical for account', cls: r >= 3 ? 'ok' : r >= 1 ? 'accent' : '' };
+}
+VIEWS_RENDER_.teardown = () => {
+  const s = sub('teardown', 'videos');
+  return `<div class="vhead"><div><div class="eyebrow">V2 · Learn from what works</div><h1>${s === 'videos' ? 'Video teardowns' : 'Pattern library'}</h1>
+    <p>${s === 'videos' ? 'Add a reference video with its transcript, a few screenshots and the visible numbers. You get the hook, structure, craft and ways to adapt it in our voice.' : 'Hooks, structures and formats collected from teardowns. Pick one when generating concepts.'}</p></div>
+    ${subtabs('teardown', [['videos', 'Teardowns'], ['patterns', 'Pattern library']], 'videos')}</div>
+  ${s === 'videos' ? `
+  <div class="cols">
+    <div class="panel form" id="td-form">
+      <h2>New teardown</h2><p class="hint" style="margin:0">The page can't watch a link. It works from the transcript, screenshots and your notes.</p>
+      <label class="f">Link <input type="url" id="td-link" placeholder="https://www.instagram.com/reel/…"></label>
+      <div class="row">
+        <label class="f">Platform <select id="td-platform">${['Instagram Reels','TikTok','YouTube Shorts','YouTube','LinkedIn','Other'].map(p => `<option>${p}</option>`).join('')}</select></label>
+        <label class="f">Creator <input type="text" id="td-creator" placeholder="@handle"></label>
+      </div>
+      <div class="row">
+        <label class="f">Followers <input type="text" id="td-followers" inputmode="numeric" placeholder="48K"></label>
+        <label class="f">Views <input type="text" id="td-views" inputmode="numeric" placeholder="1.2M"></label>
+        <label class="f">Likes <input type="text" id="td-likes" inputmode="numeric"></label>
+        <label class="f">Comments <input type="text" id="td-comments" inputmode="numeric"></label>
+      </div>
+      <label class="f">Transcript or auto-captions <textarea id="td-transcript" class="tall" placeholder="Paste the transcript. Timestamps help with pacing."></textarea></label>
+      <label class="f">What you noticed <span class="opt">(cuts, camera, sound, text on screen)</span><textarea id="td-notes" placeholder="Hard cut every ~1s for the first 5s, trending audio, text hook in the top third…"></textarea></label>
+      <div id="td-imgwrap" ${IMG ? '' : 'hidden'}><label class="f">Screenshots of key moments <span class="opt">(up to ${IMG?.maxCount || 4})</span><input type="file" id="td-images" accept="image/png,image/jpeg,image/webp" multiple></label><div class="thumbs" id="td-thumbs" style="margin-top:6px"></div></div>
+      <div class="actions"><button class="btn primary" id="td-run">Break it down</button><button class="btn" id="td-save-only">Save without analysis</button></div>
+      <div id="td-msg"></div>
+    </div>
+    <div class="stack"><div class="list" id="td-list"></div></div>
+  </div>` : `
+  <div class="cols">
+    <div class="panel form">
+      <h2>Add a pattern</h2><p class="hint" style="margin:0">Teardowns add patterns automatically. Add your own here.</p>
+      <label class="f">Name <input type="text" id="pt-name" placeholder="e.g. Wrong-way-first demo"></label>
+      <label class="f">Kind <select id="pt-kind"><option value="hook">Hook</option><option value="structure">Structure</option><option value="format">Format</option></select></label>
+      <label class="f">How it works <textarea id="pt-desc"></textarea></label>
+      <div class="actions"><button class="btn primary" id="pt-add">Add pattern</button></div>
+    </div>
+    <div class="stack">
+      <div class="subtabs" role="group" id="pt-filter">${[['all','All'],['hook','Hooks'],['structure','Structures'],['format','Formats']].map(([k,l]) => `<button data-pf="${k}" aria-pressed="${UI.patFilter === k}">${l}</button>`).join('')}</div>
+      <div class="grid-cards" id="pt-list"></div>
+    </div>
+  </div>`}`;
+};
+PAINT.teardown = () => {
+  const s = sub('teardown', 'videos');
+  if (s === 'videos') {
+    const el = $('#td-list'); if (!el) return;
+    el.innerHTML = S.teardowns.length ? S.teardowns.map(t => {
+      const o = outlier(t); const a = t.analysis;
+      return `<div class="item click" data-open-td="${t.id}" tabindex="0" role="button">
+        <div class="meta"><span class="chip">${esc(t.platform || 'Video')}</span>${t.creator ? `<span>${esc(t.creator)}</span>` : ''}${o ? `<span class="chip ${o.cls}">${o.label} · ${o.r.toFixed(1)}×</span>` : ''}${a?.hook?.type ? `<span class="chip accent">${esc(a.hook.type)}</span>` : ''}<span class="spacer"></span><span class="tc">${fmtDate(t.createdAt)}</span></div>
+        <h3>${esc(a?.summary || t.title || t.link || 'Untitled reference')}</h3>
+        ${a?.whyItWorked?.transferable ? `<p>${esc(a.whyItWorked.transferable)}</p>` : `<p>${a ? '' : 'Not analysed yet.'}</p>`}
+      </div>`;
+    }).join('') : `<div class="empty"><strong>No teardowns yet.</strong>Start with a video you wish you'd made. Paste its transcript on the left, add two or three screenshots, and press "Break it down". Patterns from it land in the library automatically.</div>`;
+  } else {
+    const el = $('#pt-list'); if (!el) return;
+    const ps = S.patterns.filter(p => UI.patFilter === 'all' || p.kind === UI.patFilter);
+    el.innerHTML = ps.length ? ps.map(p => `<div class="item">
+      <div class="meta"><span class="chip accent">${esc(p.kind || 'pattern')}</span><span class="tc">${list(p.examples).length} example${list(p.examples).length === 1 ? '' : 's'}</span></div>
+      <h3>${esc(p.name)}</h3><p>${esc(p.description || '')}</p>
+      ${list(p.examples).length ? `<div class="meta">${list(p.examples).slice(0, 3).map(x => `<span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.creator || 'source')}</a>` : esc(x.creator || 'source')}${x.ratio ? ' · ' + x.ratio + '×' : ''}</span>`).join(' · ')}</div>` : ''}
+      <div class="actions"><button class="btn small" data-use-pattern="${p.id}">Use in concepts</button><span class="spacer"></span><button class="btn small ghost danger" data-del="patterns:${p.id}">Delete</button></div>
+    </div>`).join('') : `<div class="empty"><strong>The library is empty.</strong>Every teardown adds the hooks and structures it finds. You can also add patterns you already know work.</div>`;
+  }
+};
+function tdPrompt(t) {
+  const o = outlier(t);
+  return `${brandContext(1200)}
+
+TASK: You are Videobolt's short-form video strategist. Break down this reference video so the team can learn from it and adapt it in Videobolt's voice. ${UI.tdImages.length ? `The attached images are ${UI.tdImages.length} screenshots of key moments, in order.` : ''}
+
+Video: ${t.link || '(no link)'}
+Platform: ${t.platform} · Creator: ${t.creator || 'unknown'}
+Followers: ${t.followers || '?'} · Views: ${t.views || '?'} · Likes: ${t.likes || '?'} · Comments: ${t.comments || '?'}${o ? `\nViews-to-followers ratio: ${o.r.toFixed(2)}× (${o.label})` : ''}
+
+Transcript:
+${(t.transcript || '(none provided)').slice(0, 14000)}
+
+Filmmaker's notes:
+${t.notes || '(none)'}
+
+Separate what is transferable from what only works because of this creator. Base everything on the material given; say when something can't be judged from it. Give 2–3 adaptations for Videobolt, each tied to one of our series or formats where possible.
+
+Reply with only JSON in this shape:
+{"summary":"one sentence naming what the video is and why it's here","hook":{"type":"question | pattern interrupt | bold claim | visual surprise | relatable pain | curiosity gap | other","firstSeconds":"what happens in the first 1-3s","whyItStops":"why a viewer stops scrolling"},"structure":{"beats":["beat 1","beat 2"],"payoff":"where the payoff lands and what it is","retention":"how it holds attention"},"craft":{"cuts":"","camera":"","onScreenText":"","sound":"","trends":""},"tone":"how the creator talks to the viewer","cta":{"ask":"","naturalness":""},"performance":"what the numbers say: outlier or normal for this account","whyItWorked":{"transferable":"the principle we can reuse","creatorSpecific":"what only works for them"},"adaptations":[{"title":"","series":"","logline":"","hook":""}],"patterns":[{"name":"short reusable name","kind":"hook | structure | format","description":"how to apply it"}]}`;
+}
+function readTdForm() {
+  const v = id => $('#' + id)?.value.trim() || '';
+  return { link: v('td-link'), platform: v('td-platform'), creator: v('td-creator'), followers: v('td-followers'), views: v('td-views'), likes: v('td-likes'), comments: v('td-comments'), transcript: v('td-transcript'), notes: v('td-notes') };
+}
+async function savePatterns(analysis, t) {
+  const o = outlier(t);
+  for (const p of list(analysis?.patterns)) {
+    if (!p?.name) continue;
+    const kind = String(p.kind || 'hook').toLowerCase().split(/[^a-z]/)[0];
+    const ex = { teardownId: t.id, link: t.link, creator: t.creator, ratio: o ? +o.r.toFixed(1) : null };
+    const found = S.patterns.find(x => x.name.toLowerCase() === p.name.toLowerCase());
+    if (found) { const exs = list(found.examples).filter(e => e.teardownId !== t.id); await store.put('patterns', found.id, { ...found, examples: [...exs, ex] }); }
+    else await store.put('patterns', uid(), { name: p.name, kind: ['hook','structure','format'].includes(kind) ? kind : 'hook', description: p.description || '', platforms: [t.platform], examples: [ex] });
+  }
+}
+function openTeardown(id) {
+  const t = get('teardowns', id); if (!t) return;
+  const a = t.analysis || {}; const o = outlier(t);
+  const li = arr => list(arr).length ? `<ol>${list(arr).map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : '<p class="hint">Not given.</p>';
+  drawer(`<div class="meta"><span class="chip">${esc(t.platform)}</span>${t.creator ? `<span>${esc(t.creator)}</span>` : ''}${o ? `<span class="chip ${o.cls}">${o.label} · ${o.r.toFixed(1)}×</span>` : ''}<span class="spacer"></span>${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">Open video</a>` : ''}</div>
+    <h2>${esc(a.summary || t.link || 'Reference video')}</h2>
+    <dl class="kv"><dt>Views</dt><dd>${esc(t.views || '—')}</dd><dt>Followers</dt><dd>${esc(t.followers || '—')}</dd><dt>Likes</dt><dd>${esc(t.likes || '—')}</dd><dt>Comments</dt><dd>${esc(t.comments || '—')}</dd></dl>
+    ${t.analysis ? `<div>
+      <div class="sec"><h4>Hook · ${esc(a.hook?.type || '')}</h4><p>${esc(a.hook?.firstSeconds || '')}</p><p class="hint" style="margin:0">${esc(a.hook?.whyItStops || '')}</p></div>
+      <div class="sec"><h4>Structure</h4>${li(a.structure?.beats)}<p><strong>Payoff:</strong> ${esc(a.structure?.payoff || '')}</p><p><strong>Retention:</strong> ${esc(a.structure?.retention || '')}</p></div>
+      <div class="sec"><h4>Pacing and craft</h4><dl class="kv">${[['Cuts','cuts'],['Camera','camera'],['On-screen text','onScreenText'],['Sound','sound'],['Trends','trends']].map(([l,k]) => a.craft?.[k] ? `<dt>${l}</dt><dd>${esc(a.craft[k])}</dd>` : '').join('')}</dl></div>
+      <div class="sec"><h4>Tone and persona</h4><p>${esc(a.tone || '')}</p></div>
+      <div class="sec"><h4>CTA</h4><p>${esc(a.cta?.ask || '')}</p><p class="hint" style="margin:0">${esc(a.cta?.naturalness || '')}</p></div>
+      <div class="sec"><h4>Performance read</h4><p>${esc(a.performance || '')}</p></div>
+      <div class="sec"><h4>Why it worked</h4><p><strong>Transferable:</strong> ${esc(a.whyItWorked?.transferable || '')}</p><p><strong>Only works for them:</strong> ${esc(a.whyItWorked?.creatorSpecific || '')}</p></div>
+      <div class="sec"><h4>Videobolt adaptations</h4><div class="list">${list(a.adaptations).map((x, i) => `<div class="item"><div class="meta">${x.series ? `<span class="chip accent">${esc(x.series)}</span>` : ''}</div><h3>${esc(x.title)}</h3><p>${esc(x.logline)}</p><p><strong>Hook:</strong> ${esc(x.hook)}</p><div class="actions"><button class="btn small primary" data-adapt="${t.id}:${i}">Develop in concept generator</button></div></div>`).join('') || '<p class="hint">None.</p>'}</div></div>
+      <div class="sec"><h4>Patterns added to the library</h4><div class="meta">${list(a.patterns).map(p => `<span class="chip">${esc(p.kind)}: ${esc(p.name)}</span>`).join('') || 'None'}</div></div>
+    </div>` : `<div class="note">This reference has no analysis yet.</div>`}
+    ${t.transcript ? `<details><summary class="eyebrow" style="cursor:pointer">Transcript</summary><p class="out">${esc(t.transcript)}</p></details>` : ''}
+    <div class="actions"><button class="btn" data-reanalyse="${t.id}">${t.analysis ? 'Analyse again' : 'Analyse'}</button><span class="spacer"></span><button class="btn ghost danger" data-del="teardowns:${t.id}" data-close="1">Delete teardown</button></div>
+    <div id="dr-msg"></div>`);
+}
+
+// ================= V3 MARKET WATCH =================
+VIEWS_RENDER_.watch = () => {
+  const s = sub('watch', 'week');
+  const compOpts = S.competitors.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const titles = { week: 'This week in the market', comps: 'Competitors', shifts: 'Shift log' };
+  const blurbs = {
+    week: 'Log notable competitor posts as you see them. Each one gets a read and a suggested response. Turn the week’s logs into a digest.',
+    comps: 'Who we watch, where they post, how they position themselves.',
+    shifts: 'Where the market is moving: formats and messages rising or fading, collected from every digest.',
+  };
+  return `<div class="vhead"><div><div class="eyebrow">V3 · Keep an eye on the market</div><h1>${titles[s]}</h1><p>${blurbs[s]}</p></div>
+    ${subtabs('watch', [['week', 'This week'], ['comps', 'Competitors'], ['shifts', 'Shift log']], 'week')}</div>
+  ${s === 'week' ? `<div class="cols">
+    <div class="stack">
+      <div class="panel form" id="wl-form"><h2>Log a post</h2><p class="hint" style="margin:0">For Instagram and TikTok, which block automatic checks. Paste what you saw.</p>
+        ${S.competitors.length ? '' : '<div class="note">Add competitors first, under "Competitors".</div>'}
+        <div class="row"><label class="f">Competitor <select id="wl-comp">${compOpts}</select></label>
+          <label class="f">Platform <select id="wl-platform">${['Instagram','TikTok','YouTube','Website','Email','Other'].map(p => `<option>${p}</option>`).join('')}</select></label></div>
+        <label class="f">Link <input type="url" id="wl-link" placeholder="https://…"></label>
+        <div class="row"><label class="f">Views <input type="text" id="wl-views"></label><label class="f">Likes <input type="text" id="wl-likes"></label><label class="f">Comments <input type="text" id="wl-comments"></label></div>
+        <label class="f">What it is <textarea id="wl-note" placeholder="Caption, transcript, offer, anything notable"></textarea></label>
+        <div ${IMG ? '' : 'hidden'}><label class="f">Screenshots <span class="opt">(optional)</span><input type="file" id="wl-images" accept="image/png,image/jpeg,image/webp" multiple></label><div class="thumbs" id="wl-thumbs" style="margin-top:6px"></div></div>
+        <div class="actions"><button class="btn primary" id="wl-run" ${S.competitors.length ? '' : 'disabled'}>Log and analyse</button></div><div id="wl-msg"></div>
+      </div>
+      <div class="panel"><h2>Automatic weekly check</h2><p class="hint" style="margin:0">A scheduled job can visit each competitor's YouTube channel, site, blog and pricing page every week and write a digest here, marked "Auto". Ask Claude to set it up once your competitor list has links.</p></div>
+    </div>
+    <div class="stack">
+      <div class="panel"><div class="actions"><div><h2>Digests</h2><p class="hint" style="margin:0" id="dg-hint"></p></div><span class="spacer"></span><button class="btn primary" id="dg-run">Write this week's digest</button></div><div id="dg-msg"></div></div>
+      <div class="list" id="dg-list"></div>
+      <div class="eyebrow" style="margin-top:6px">Logged posts</div>
+      <div class="list" id="wl-list"></div>
+    </div></div>` : s === 'comps' ? `<div class="cols">
+    <div class="panel form" id="cp-form"><h2 id="cp-title">Add a competitor</h2>
+      <input type="hidden" id="cp-id">
+      <label class="f">Name <input type="text" id="cp-name" placeholder="Company or creator"></label>
+      <label class="f">Positioning <textarea id="cp-positioning" placeholder="Who they sell to and how they pitch it"></textarea></label>
+      <div class="row"><label class="f">YouTube <input type="url" id="cp-youtube"></label><label class="f">Instagram <input type="url" id="cp-instagram"></label></div>
+      <div class="row"><label class="f">TikTok <input type="url" id="cp-tiktok"></label><label class="f">Website <input type="url" id="cp-website"></label></div>
+      <div class="row"><label class="f">Pricing page <input type="url" id="cp-pricing"></label><label class="f">Blog or changelog <input type="url" id="cp-blog"></label></div>
+      <label class="f">Voice <input type="text" id="cp-voice" placeholder="How they sound"></label>
+      <div class="row"><label class="f">Posting rhythm <input type="text" id="cp-rhythm" placeholder="e.g. 5 Reels a week"></label><label class="f">Recurring formats <input type="text" id="cp-formats"></label></div>
+      <label class="f">Pricing and product notes <textarea id="cp-product"></textarea></label>
+      <div class="actions"><button class="btn primary" id="cp-save">Save competitor</button><button class="btn ghost" id="cp-clear">Clear</button></div>
+    </div>
+    <div class="grid-cards" id="cp-list"></div></div>` : `<div class="list" id="sh-list"></div>`}`;
+};
+const LINKS = [['youtube','YouTube'],['instagram','Instagram'],['tiktok','TikTok'],['website','Website'],['pricing','Pricing'],['blog','Blog']];
+PAINT.watch = () => {
+  const s = sub('watch', 'week');
+  const cname = id => get('competitors', id)?.name || 'Unknown';
+  if (s === 'week') {
+    const sel = $('#wl-comp'); if (sel) { const v = sel.value; sel.innerHTML = S.competitors.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join(''); if (v) sel.value = v; $('#wl-run').disabled = !S.competitors.length; }
+    const recent = S.watch.filter(w => Date.now() - new Date(w.createdAt) < 7 * 864e5);
+    const h = $('#dg-hint'); if (h) h.textContent = `${recent.length} post${recent.length === 1 ? '' : 's'} logged in the last 7 days.`;
+    const dr = $('#dg-run'); if (dr) dr.disabled = !recent.length;
+    $('#dg-list').innerHTML = S.digests.length ? S.digests.slice(0, 6).map(d => `<div class="item click" data-open-dg="${d.id}" tabindex="0" role="button">
+      <div class="meta"><span class="chip ${d.source === 'scheduled' ? 'accent' : ''}">${d.source === 'scheduled' ? 'Auto' : 'From logs'}</span><span class="tc">Week of ${fmtDate(d.weekOf || d.createdAt)}</span><span class="spacer"></span><span class="tc">${list(d.moves).length} moves</span></div>
+      <h3>${esc(d.headline || 'Weekly digest')}</h3><p>${esc((d.summary || '').slice(0, 220))}${(d.summary || '').length > 220 ? '…' : ''}</p></div>`).join('')
+      : `<div class="empty"><strong>No digests yet.</strong>Log a few competitor posts this week, then press "Write this week's digest". The automatic weekly check will add its own digests here too.</div>`;
+    $('#wl-list').innerHTML = S.watch.length ? S.watch.slice(0, 30).map(w => { const a = w.analysis || {}; return `<div class="item">
+      <div class="meta"><strong style="color:var(--ink)">${esc(cname(w.competitorId))}</strong><span class="chip">${esc(w.platform)}</span>${a.response ? `<span class="chip ${esc(a.response)}">${esc(a.response)}</span>` : ''}${a.signal ? `<span class="chip">${esc(a.signal)}</span>` : ''}<span class="spacer"></span><span class="tc">${fmtDate(w.createdAt)}</span></div>
+      <h3>${esc(a.summary || w.note?.slice(0, 120) || w.link)}</h3>${a.why ? `<p>${esc(a.why)}</p>` : ''}${a.angle ? `<p><strong>Our angle:</strong> ${esc(a.angle)}</p>` : ''}
+      <div class="actions">${w.link ? `<a class="btn small ghost" href="${esc(w.link)}" target="_blank" rel="noopener">Open</a>` : ''}${a.angle ? `<button class="btn small" data-watch-concept="${w.id}">Develop our response</button>` : ''}<span class="spacer"></span><button class="btn small ghost danger" data-del="watch:${w.id}">Delete</button></div></div>`; }).join('')
+      : `<div class="empty">Logged posts appear here, newest first.</div>`;
+  } else if (s === 'comps') {
+    const el = $('#cp-list'); if (!el) return;
+    el.innerHTML = S.competitors.length ? S.competitors.map(c => { const n = S.watch.filter(w => w.competitorId === c.id).length; return `<div class="item">
+      <div class="meta"><span class="tc">${n} logged post${n === 1 ? '' : 's'}</span></div><h3>${esc(c.name)}</h3>${c.positioning ? `<p>${esc(c.positioning)}</p>` : ''}
+      ${c.rhythm || c.formats ? `<dl class="kv">${c.rhythm ? `<dt>Rhythm</dt><dd>${esc(c.rhythm)}</dd>` : ''}${c.formats ? `<dt>Formats</dt><dd>${esc(c.formats)}</dd>` : ''}</dl>` : ''}
+      <div class="meta">${LINKS.filter(([k]) => c.links?.[k]).map(([k, l]) => `<a href="${esc(c.links[k])}" target="_blank" rel="noopener">${l}</a>`).join(' · ') || 'No links yet'}</div>
+      <div class="actions"><button class="btn small" data-edit-comp="${c.id}">Edit</button><span class="spacer"></span><button class="btn small ghost danger" data-del="competitors:${c.id}">Delete</button></div></div>`; }).join('')
+      : `<div class="empty"><strong>No competitors yet.</strong>Add the companies and creators you want to keep an eye on, with their YouTube, Instagram, TikTok and website links. YouTube, websites, blogs and pricing pages can be checked automatically every week.</div>`;
+  } else {
+    const el = $('#sh-list'); if (!el) return;
+    const dirCls = { rising: 'ok', fading: 'rec', new: 'accent' };
+    el.innerHTML = S.shifts.length ? S.shifts.map(x => `<div class="item"><div class="meta"><span class="chip ${dirCls[x.direction] || ''}">${esc(x.direction || 'shift')}</span><span class="spacer"></span><span class="tc">${fmtDate(x.createdAt)}</span></div><h3>${esc(x.trend)}</h3><p>${esc(x.evidence || '')}</p></div>`).join('')
+      : `<div class="empty"><strong>The shift log fills itself.</strong>Every digest notes formats and messages that are rising, fading or new. Over a few months this becomes the record of where the market is heading.</div>`;
+  }
+};
+function compSummary(c) { return `${c.name}${c.positioning ? ' — ' + c.positioning : ''}${c.voice ? ' | voice: ' + c.voice : ''}${c.formats ? ' | formats: ' + c.formats : ''}${c.product ? ' | product/pricing: ' + c.product : ''}`; }
+function openDigest(id) {
+  const d = get('digests', id); if (!d) return;
+  drawer(`<div class="meta"><span class="chip ${d.source === 'scheduled' ? 'accent' : ''}">${d.source === 'scheduled' ? 'Auto' : 'From logs'}</span><span class="tc">Week of ${fmtDate(d.weekOf || d.createdAt)}</span></div>
+    <h2>${esc(d.headline || 'Weekly digest')}</h2><p class="out">${esc(d.summary || '')}</p>
+    <div class="sec"><h4>Moves</h4><div class="list">${list(d.moves).map(m => `<div class="item"><div class="meta"><strong style="color:var(--ink)">${esc(m.competitor)}</strong>${m.response ? `<span class="chip ${esc(m.response)}">${esc(m.response)}</span>` : ''}</div><h3>${esc(m.what)}</h3>${m.angle ? `<p><strong>Our angle:</strong> ${esc(m.angle)}</p>` : ''}</div>`).join('') || '<p class="hint">None.</p>'}</div></div>
+    <div class="sec"><h4>Shifts</h4>${list(d.shifts).map(x => `<p><span class="chip">${esc(x.direction)}</span> ${esc(x.trend)}</p>`).join('') || '<p class="hint">None.</p>'}</div>
+    <div class="actions"><span class="spacer"></span><button class="btn ghost danger" data-del="digests:${d.id}" data-close="1">Delete digest</button></div>`);
+}
+
+// ================= V4 CONCEPTS =================
+const GOALS = ['Awareness', 'Template sales', 'Tutorial / how-to', 'Community and engagement', 'Product launch', 'Seasonal moment'];
+const STATUSES = [['idea', 'Idea'], ['shortlist', 'Shortlisted'], ['dev', 'In development'], ['made', 'Produced'], ['parked', 'Parked']];
+VIEWS_RENDER_.concepts = () => {
+  const b = S.bible || {};
+  const seriesOpts = list(b.series).filter(s => s.name).map(s => `<option>${esc(s.name)}</option>`).join('');
+  const perOpts = list(b.personas).filter(p => p.name).map(p => `<option>${esc(p.name)}${p.handle ? ' (' + esc(p.handle) + ')' : ''}</option>`).join('');
+  const patOpts = S.patterns.map(p => `<option value="${p.id}">${esc(p.kind)}: ${esc(p.name)}</option>`).join('');
+  const s = sub('concepts', 'gen');
+  return `<div class="vhead"><div><div class="eyebrow">V4 · Ideas in our language</div><h1>${s === 'gen' ? 'Concept generator' : 'Concept board'}</h1>
+    <p>${s === 'gen' ? 'Pick a series, platform and goal. Every concept is written against the brand bible and comes with a hook and a production cost.' : 'Saved concepts. Rate them, leave notes, move the good ones into scripts.'}</p></div>
+    ${subtabs('concepts', [['gen', 'Generate'], ['board', `Board (${S.concepts.length})`]], 'gen')}</div>
+  ${s === 'gen' ? `<div class="cols">
+    <div class="panel form">
+      <h2>Brief</h2>
+      <div id="cg-seed"></div>
+      <div class="row"><label class="f">Series or format <select id="cg-series"><option value="">Any that fits</option>${seriesOpts}<option value="__new">Something new</option></select></label>
+        <label class="f">Platform <select id="cg-platform">${['Instagram Reels','TikTok','YouTube Shorts','YouTube (long)','LinkedIn','Multi-platform'].map(p => `<option>${p}</option>`).join('')}</select></label></div>
+      <div class="row"><label class="f">Goal <select id="cg-goal">${GOALS.map(g => `<option>${g}</option>`).join('')}</select></label>
+        <label class="f">Account voice <select id="cg-persona"><option value="">Main Videobolt voice</option>${perOpts}</select></label></div>
+      <label class="f">Hook or occasion <span class="opt">(optional)</span><input type="text" id="cg-hook" placeholder="e.g. Earth Day, a trending audio, a customer question"></label>
+      <label class="f">Template to feature <span class="opt">(optional)</span><input type="text" id="cg-template" placeholder="Template name or link"></label>
+      <label class="f">Pattern from the library <span class="opt">(optional)</span><select id="cg-pattern"><option value="">None</option>${patOpts}</select></label>
+      <label class="f">Anything else <span class="opt">(optional)</span><textarea id="cg-extra" placeholder="Constraints: shoot this week, no location, under 30 seconds…"></textarea></label>
+      <div class="row"><label class="f">How many <select id="cg-n"><option>3</option><option selected>5</option><option>8</option></select></label></div>
+      <div class="actions"><button class="btn primary" id="cg-run">Generate concepts</button></div><div id="cg-msg"></div>
+    </div>
+    <div class="stack"><div id="cg-results" class="list"></div></div></div>`
+  : `<div class="stack"><div class="actions"><div class="subtabs" role="group">${[['all','All'],...STATUSES].map(([k,l]) => `<button data-bf="${k}" aria-pressed="${UI.boardFilter === k}">${l}</button>`).join('')}</div></div><div class="grid-cards" id="board"></div></div>`}`;
+};
+const tierCls = { lean: 'ok', moderate: 'warn', heavy: 'rec' };
+function conceptCard(c, saved, viewOnly = false) {
+  const tier = String(c.production?.tier || '').toLowerCase();
+  return `<div class="item">
+    <div class="meta">${c.series ? `<span class="chip accent">${esc(c.series)}</span>` : ''}${c.format ? `<span class="chip">${esc(c.format)}</span>` : ''}${tier ? `<span class="chip ${tierCls[tier] || ''}">${esc(tier)} production</span>` : ''}${saved && c.platform ? `<span class="chip">${esc(c.platform)}</span>` : ''}</div>
+    <h3>${esc(c.title)}</h3><p>${esc(c.logline)}</p>
+    <p><strong>Hook:</strong> ${esc(c.hook)}</p>
+    ${list(c.beatsPreview).length ? `<ol style="margin:0;padding-left:20px;font-size:14px;color:var(--muted)">${list(c.beatsPreview).map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
+    ${c.whyOnBrand ? `<p><strong>Why it’s us:</strong> ${esc(c.whyOnBrand)}</p>` : ''}
+    ${list(c.production?.needs).length ? `<p><strong>Needs:</strong> ${list(c.production.needs).map(esc).join(', ')}</p>` : ''}
+    ${c.templateTieIn ? `<p><strong>Template tie-in:</strong> ${esc(c.templateTieIn)}</p>` : ''}
+    ${saved ? `<div class="actions"><span class="stars" aria-label="Rating">${[1,2,3,4,5].map(n => `<button class="${(c.rating || 0) >= n ? 'on' : ''}" data-rate="${c.id}:${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</span>
+        <span class="spacer"></span><select data-status="${c.id}" aria-label="Status" style="width:auto">${STATUSES.map(([k,l]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <textarea data-cnote="${c.id}" placeholder="Notes for the team" style="min-height:52px">${esc(c.notes || '')}</textarea>
+      <div class="actions"><button class="btn small primary" data-to-script="${c.id}">${S.scripts.some(x => x.id === c.id) ? 'Open script' : 'Develop script'}</button><span class="spacer"></span><button class="btn small ghost danger" data-del="concepts:${c.id}">Delete</button></div>`
+    : viewOnly ? '' : `<div class="actions"><button class="btn small primary" data-save-gen="${c._k}">Save to board</button></div>`}
+  </div>`;
+}
+PAINT.concepts = (what) => {
+  const s = sub('concepts', 'gen');
+  if (s === 'gen') {
+    const seed = $('#cg-seed');
+    if (seed) seed.innerHTML = UI.genSeed ? `<div class="note"><div class="actions"><strong>Starting point</strong><span class="spacer"></span><button class="btn small ghost" id="cg-seed-x">Remove</button></div>${esc(UI.genSeed.label)}</div>` : '';
+    if (UI.genSeed?.patternId && $('#cg-pattern') && !what) $('#cg-pattern').value = UI.genSeed.patternId;
+    const r = $('#cg-results'); if (!r) return;
+    r.innerHTML = UI.genResults.length ? UI.genResults.map(c => conceptCard(c, false)).join('')
+      : `<div class="empty"><strong>Concepts appear here.</strong>Fill in the brief and press "Generate concepts". Save the ones you like to the board. You can also start from a teardown adaptation, a competitor move, or a pattern from the library.</div>`;
+  } else {
+    const el = $('#board'); if (!el) return;
+    if (what === 'concepts' && document.activeElement?.matches('[data-cnote]')) return; // don't wipe a note mid-typing
+    const cs = S.concepts.filter(c => UI.boardFilter === 'all' || (c.status || 'idea') === UI.boardFilter).sort((a, b) => (b.rating || 0) - (a.rating || 0) || byNew(a, b));
+    el.innerHTML = cs.length ? cs.map(c => conceptCard(c, true)).join('') : `<div class="empty"><strong>Nothing on the board${UI.boardFilter === 'all' ? ' yet' : ' with this status'}.</strong>Generate concepts and save the good ones here.</div>`;
+  }
+};
+function conceptPrompt(f) {
+  const pat = f.patternId ? get('patterns', f.patternId) : null;
+  return `${brandContext()}
+
+TASK: Generate ${f.n} distinct video concepts for Videobolt.
+Series or format: ${f.series === '__new' ? 'Propose new formats that would fit the brand' : f.series || 'Choose whichever of our series fits each idea best'}
+Platform: ${f.platform}
+Goal: ${f.goal}
+Account voice: ${f.persona || 'Main Videobolt voice'}
+${f.hook ? 'Hook or occasion: ' + f.hook + '\n' : ''}${f.template ? 'Template to feature: ' + f.template + '\n' : ''}${pat ? `Build on this proven pattern from our library: ${pat.name} (${pat.kind}): ${pat.description}\n` : ''}${UI.genSeed ? 'Starting point: ' + UI.genSeed.text + '\n' : ''}${f.extra ? 'Extra direction: ' + f.extra + '\n' : ''}
+Rules:
+- Every concept must sound like the brand bible and respect the words we avoid.
+- The hook must land in the first 1–3 seconds and work with the sound off.
+- Make the concepts genuinely different from each other (angle, structure, format), not variations of one idea.
+- Production tier: lean = one person on camera or a screen recording, no location; moderate = a location, props or a second person; heavy = several locations, extras, or animation beyond our templates.
+
+Reply with only a JSON array:
+[{"title":"","series":"","format":"","logline":"one or two sentences","hook":"exactly what happens and is said in the first 3 seconds","beatsPreview":["3-5 short beats"],"whyOnBrand":"","production":{"tier":"lean | moderate | heavy","needs":["people, location, props"]},"templateTieIn":"how a Videobolt template shows up, or empty"}]`;
+}
+
+// ================= V5 SCRIPTS =================
+const STAGES = [
+  ['beats', 'Beat outline'], ['script', 'Full script'], ['shots', 'Shot list'], ['captions', 'Captions'],
+];
+VIEWS_RENDER_.scripts = () => {
+  const c = UI.scriptId && get('concepts', UI.scriptId);
+  return `<div class="vhead"><div><div class="eyebrow">V5 · From concept to shoot</div><h1>${c ? esc(c.title) : 'Script developer'}</h1>
+    <p>${c ? esc(c.logline) : 'Pick a saved concept. It builds in four stages: beats, full script, shot list and captions. Edit each stage before moving on.'}</p></div>
+    ${c ? `<div class="actions"><button class="btn" id="sc-pick">Change concept</button></div>` : ''}</div>
+  ${c ? `<div id="sc-editor"></div>` : `<div class="grid-cards" id="sc-picker"></div>`}`;
+};
+function scriptDoc(id) { return get('scripts', id) || { id, stages: {}, done: {} }; }
+function spokenLines(text) {
+  const out = [];
+  for (const line of String(text || '').split('\n')) {
+    const m = line.match(/^\s*(VO|ON CAMERA|DIALOGUE)(\s*\([^)]*\))?\s*:\s*(.*)$/i);
+    if (m && m[3].trim()) out.push(m[3].trim());
+  }
+  return out;
+}
+function readTime(text) {
+  const spoken = spokenLines(text);
+  const words = (spoken.length ? spoken.join(' ') : String(text || '')).split(/\s+/).filter(Boolean).length;
+  const sec = Math.round(words / wpm() * 60);
+  return { words, sec, spokenOnly: !!spoken.length, label: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` };
+}
+PAINT.scripts = (what) => {
+  const picker = $('#sc-picker');
+  if (picker && UI.scriptId && get('concepts', UI.scriptId)) { render(); return; }
+  if (picker) {
+    const cs = [...S.concepts].sort((a, b) => (S.scripts.some(x => x.id === b.id) - S.scripts.some(x => x.id === a.id)) || (b.rating || 0) - (a.rating || 0));
+    picker.innerHTML = cs.length ? cs.map(c => { const d = get('scripts', c.id); const n = d ? STAGES.filter(([k]) => d.done?.[k]).length : 0; return `<div class="item click" data-to-script="${c.id}" tabindex="0" role="button">
+      <div class="meta">${c.series ? `<span class="chip accent">${esc(c.series)}</span>` : ''}<span class="chip ${n === 4 ? 'ok' : ''}">${d ? n + '/4 stages' : 'Not started'}</span>${c.rating ? `<span style="color:var(--star)">${'★'.repeat(c.rating)}</span>` : ''}</div>
+      <h3>${esc(c.title)}</h3><p>${esc(c.logline)}</p></div>`; }).join('')
+      : `<div class="empty"><strong>No saved concepts.</strong>Save a concept to the board first, then develop it here.</div>`;
+    return;
+  }
+  const ed = $('#sc-editor'); if (!ed) return;
+  if (what && what !== 'scripts' && what !== '*') return;
+  // keep the editor stable while someone is typing in it or Claude is writing
+  if (what && ed.childElementCount && (generating || stageT || ed.contains(document.activeElement))) { paintStageRail(); return; }
+  paintScriptEditor();
+};
+function paintStageRail() {
+  const d = scriptDoc(UI.scriptId); const rail = $('#sc-rail'); if (!rail) return;
+  rail.innerHTML = STAGES.map(([k, l], i) => `${i ? '<span class="wire"></span>' : ''}<button data-stage="${k}" class="${d.done?.[k] ? 'done' : ''} ${UI.stage === k ? 'cur' : ''}"><span class="dia"></span>${l}</button>`).join('') + `<span class="wire"></span><button data-stage="export" class="${UI.stage === 'export' ? 'cur' : ''}"><span class="dia"></span>Export</button>`;
+}
+function paintScriptEditor() {
+  const ed = $('#sc-editor'); const c = get('concepts', UI.scriptId); if (!ed || !c) return;
+  const d = scriptDoc(c.id);
+  const st = UI.stage;
+  let body;
+  if (st === 'export') {
+    const rt = readTime(d.stages?.script);
+    body = `<div class="cols even"><div class="panel"><h2>Package</h2><p class="hint">Concept, beats, script, shot list and captions in one file.</p>
+      <dl class="kv"><dt>Read time</dt><dd>${d.stages?.script ? `${rt.label} at ${wpm()} wpm · ${rt.words} words${rt.spokenOnly ? ' spoken' : ''}` : '—'}</dd>
+      ${STAGES.map(([k, l]) => `<dt>${l}</dt><dd>${d.done?.[k] ? '<span class="chip ok">Approved</span>' : d.stages?.[k] ? '<span class="chip warn">Draft</span>' : '<span class="chip">Empty</span>'}</dd>`).join('')}</dl>
+      <div class="actions" style="margin-top:14px"><button class="btn primary" id="ex-prompter" ${d.stages?.script ? '' : 'disabled'}>Open teleprompter</button><button class="btn" id="ex-copy">Copy package</button>${DL ? `<button class="btn" id="ex-dl">Download .md</button><button class="btn" id="ex-dl-tp" ${d.stages?.script ? '' : 'disabled'}>Download teleprompter .txt</button>` : ''}</div></div>
+      <div class="panel"><h2>Brand check</h2><p class="hint">Reads the script against the brand bible and flags lines that drift.</p><div id="bc-out">${checkHtml(d.check)}</div>
+      <div class="actions"><button class="btn" id="bc-run" ${d.stages?.script ? '' : 'disabled'}>${d.check ? 'Check again' : 'Check script'}</button></div></div></div>`;
+  } else {
+    const label = STAGES.find(s => s[0] === st)[1];
+    const prevMissing = STAGES.slice(0, STAGES.findIndex(s => s[0] === st)).filter(([k]) => !d.stages?.[k]).map(s => s[1]);
+    const help = {
+      beats: 'Numbered beats with rough timecodes, from hook to CTA.',
+      script: 'Per beat: VISUAL, ON-SCREEN and spoken lines (VO: or ON CAMERA:). The teleprompter reads only the spoken lines.',
+      shots: 'Every shot you need on the day, with framing, location and props.',
+      captions: 'Caption copy for each platform and account, with hashtags.',
+    }[st];
+    const rt = st === 'script' && d.stages?.script ? readTime(d.stages.script) : null;
+    body = `<div class="panel form">
+      <div class="actions"><div><h2>${label}</h2><p class="hint" style="margin:0">${help}</p></div><span class="spacer"></span>${rt ? `<span class="tc" id="sc-rt">${rt.label} read · ${rt.words} words</span>` : ''}</div>
+      ${prevMissing.length ? `<div class="note">Earlier stages are empty (${prevMissing.join(', ')}). You can still generate this one from the concept alone.</div>` : ''}
+      <div class="row"><label class="f">Direction for this stage <span class="opt">(optional)</span><input type="text" id="sc-dir" placeholder="${st === 'beats' ? 'e.g. 30 seconds, end on the template reveal' : st === 'script' ? 'e.g. punchier VO, add a joke in beat 2' : st === 'shots' ? 'e.g. we only have the office and one light' : 'e.g. YouTube description and the three test accounts'}"></label></div>
+      <div class="actions"><button class="btn primary" id="sc-gen">${d.stages?.[st] ? 'Rewrite with Claude' : 'Write with Claude'}</button><button class="btn ghost" id="sc-stop" hidden>Stop</button><span class="spacer"></span><span class="tc" id="sc-saved"></span></div>
+      <textarea class="code" id="sc-text" placeholder="Write here, or press the button above.">${esc(d.stages?.[st] || '')}</textarea>
+      <div id="sc-msg"></div>
+      <div class="actions"><button class="btn ${d.done?.[st] ? '' : 'primary'}" id="sc-approve">${d.done?.[st] ? 'Approved · undo' : 'Approve and continue'}</button></div>
+    </div>`;
+  }
+  ed.innerHTML = `<div class="kf" id="sc-rail"></div>${body}
+    <details style="margin-top:16px"><summary class="eyebrow" style="cursor:pointer">Concept details</summary><div style="margin-top:10px">${conceptCard(c, false, true)}</div></details>`;
+  paintStageRail();
+}
+function checkHtml(ch) {
+  if (!ch) return '<p class="hint">Not checked yet.</p>';
+  return `<div class="actions"><strong style="font-family:var(--f-display);font-size:24px">${esc(ch.score)}</strong><span class="tc">/ 100</span><span class="spacer"></span><span class="tc">${fmtDate(ch.at)}</span></div><p>${esc(ch.verdict || '')}</p>
+    ${list(ch.issues).length ? `<div class="list" style="margin-top:8px">${list(ch.issues).map(i => `<div class="item"><p style="color:var(--ink)">“${esc(i.quote)}”</p><p>${esc(i.problem)}</p><p><strong>Try:</strong> ${esc(i.fix)}</p></div>`).join('')}</div>` : ''}
+    ${list(ch.strengths).length ? `<p style="margin-top:8px"><strong>Working:</strong> ${list(ch.strengths).map(esc).join('; ')}</p>` : ''}`;
+}
+function stagePrompt(st, c, d, dir) {
+  const ctx = `CONCEPT
+Title: ${c.title}
+Series/format: ${c.series || ''} ${c.format ? '· ' + c.format : ''}
+Platform: ${c.platform || ''} · Goal: ${c.goal || ''} · Account voice: ${c.persona || 'Main Videobolt voice'}
+Logline: ${c.logline}
+Hook: ${c.hook}
+Beats preview: ${list(c.beatsPreview).join(' / ')}
+Production: ${c.production?.tier || ''} — ${list(c.production?.needs).join(', ')}
+Template tie-in: ${c.templateTieIn || 'none'}
+Team notes: ${c.notes || 'none'}`;
+  const prev = k => d.stages?.[k] ? `\n\nAPPROVED ${k.toUpperCase()}:\n${d.stages[k]}` : '';
+  const current = d.stages?.[st] ? `\n\nCURRENT DRAFT OF THIS STAGE (rewrite it, keep what works):\n${d.stages[st]}` : '';
+  const direction = dir ? `\n\nDIRECTION FROM THE TEAM: ${dir}` : '';
+  const task = {
+    beats: `Write the beat outline. Number each beat and give a rough timecode range, like "1. [00:00–00:03] Hook — …". Say what the viewer sees and what idea each beat carries. End with the CTA beat. Plain text, no preamble.`,
+    script: `Write the full shooting script from the beats. For each beat use exactly this layout:
+[00:00–00:03] BEAT 1 — short name
+VISUAL: what we see
+ON-SCREEN: text on screen, or "—"
+VO: spoken voice-over line   (or ON CAMERA: for lines said to camera; ON CAMERA (Name): for another person)
+Keep spoken lines tight; the speaking pace is ${wpm()} words per minute. Plain text, no preamble.`,
+    shots: `Write the shot list for the shoot day from the script. One line per shot:
+#  | Shot | Framing / lens | Location | Props | Notes
+Group shots by location to save setup time. Then add a short "Props and prep" checklist. Plain text, no preamble.`,
+    captions: `Write the publishing copy. For each platform this video goes to (and for each of our accounts or personas if relevant), give the caption in that account's voice, a first line that works before "more", 3–8 hashtags that fit, and the character count. For YouTube, include a title and a description with chapters. Respect platform character limits. Plain text with a header per platform/account, no preamble.`,
+  }[st];
+  return `${brandContext(1600)}\n\n${ctx}${st !== 'beats' ? prev('beats') : ''}${st === 'shots' || st === 'captions' ? prev('script') : ''}${current}${direction}\n\nTASK: ${task}`;
+}
+function packageText(c, d) {
+  const rt = readTime(d.stages?.script);
+  return `# ${c.title}\n\n${c.logline}\n\n**Hook:** ${c.hook}\n**Series:** ${c.series || '—'} · **Platform:** ${c.platform || '—'} · **Goal:** ${c.goal || '—'}\n**Read time:** ${d.stages?.script ? rt.label + ' at ' + wpm() + ' wpm' : '—'}\n\n` +
+    STAGES.map(([k, l]) => `## ${l}\n\n${d.stages?.[k] || '_Not written yet._'}`).join('\n\n') + '\n';
+}
+function prompterText(d) { const sp = spokenLines(d.stages?.script); return sp.length ? sp.join('\n\n') : String(d.stages?.script || ''); }
+function openPrompter(text) {
+  const L = $('#layer');
+  L.innerHTML = `<div class="prompter" role="dialog" aria-label="Teleprompter"><div class="bar"><button id="tp-play">Start</button><label>Speed <input type="range" id="tp-speed" min="10" max="160" value="50"></label><label>Size <input type="range" id="tp-size" min="28" max="96" value="48"></label><label><input type="checkbox" id="tp-mirror"> Mirror</label><span style="flex:1"></span><button id="tp-reset">Back to top</button><button id="tp-close">Close</button></div>
+    <div class="scroll"><div class="guide"></div><div class="text" id="tp-text"></div></div></div>`;
+  const el = $('#tp-text'); el.textContent = text;
+  let y = 0, playing = false, last = 0, raf;
+  const apply = () => { el.style.transform = `translateY(${-y}px)` + ($('#tp-mirror').checked ? ' scaleX(-1)' : ''); };
+  const step = t => { if (!playing) return; const dt = last ? (t - last) / 1000 : 0; last = t; y += dt * +$('#tp-speed').value; apply(); raf = requestAnimationFrame(step); };
+  $('#tp-play').onclick = () => { playing = !playing; $('#tp-play').textContent = playing ? 'Pause' : 'Start'; last = 0; if (playing) raf = requestAnimationFrame(step); };
+  $('#tp-size').oninput = e => el.style.setProperty('--psize', e.target.value + 'px');
+  $('#tp-mirror').onchange = apply;
+  $('#tp-reset').onclick = () => { y = 0; apply(); };
+  const close = () => { playing = false; cancelAnimationFrame(raf); L.innerHTML = ''; document.removeEventListener('keydown', key); };
+  const key = e => { if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); $('#tp-play').click(); } };
+  $('#tp-close').onclick = close; document.addEventListener('keydown', key);
+  el.style.setProperty('--psize', '48px'); $('#tp-play').focus();
+}
+
+// ---------- drawer ----------
+function drawer(html) {
+  $('#layer').innerHTML = `<div class="scrim" id="scrim"><aside class="drawer" role="dialog" aria-modal="true"><div class="actions"><span class="spacer"></span><button class="btn small ghost" id="dr-close">Close</button></div>${html}</aside></div>`;
+  $('#dr-close').focus();
+}
+function closeDrawer() { $('#layer').innerHTML = ''; }
+
+// ---------- events ----------
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button, [data-open-td], [data-open-dg], [data-to-script]'); if (!t) return;
+  const ds = t.dataset;
+  if (ds.view) return go(ds.view);
+  if (ds.sub) { const [v, s] = ds.sub.split(':'); return setSub(v, s); }
+  if (t.id === 'dr-close') return closeDrawer();
+
+  // bible
+  if (ds.add) { const b = draft(); b[ds.add] = [...list(b[ds.add]), {}]; markBibleDirty(); paintBibleArrays(); return; }
+  if (ds.rm) { const [k, i] = ds.rm.split(':'); const b = draft(); b[k] = list(b[k]).filter((_, j) => j !== +i); markBibleDirty(); paintBibleArrays(); return; }
+  if (t.id === 'b-save') { const b = draft(); b.series = list(b.series).filter(s => s.name || s.desc); b.personas = list(b.personas).filter(p => p.name || p.desc); b.refs = list(b.refs).filter(r => r.title || r.text);
+    UI.bibleDirty = false; await store.putBible(b); UI.bibleDraft = null; toast('Brand bible saved'); render(); return; }
+  if (t.id === 'b-revert') { UI.bibleDirty = false; UI.bibleDraft = null; render(); return; }
+
+  // teardowns
+  if (t.id === 'td-run' || t.id === 'td-save-only') {
+    const f = readTdForm();
+    if (!f.link && !f.transcript && !f.notes) { $('#td-msg').innerHTML = '<p class="err">Add at least a link, a transcript or your notes.</p>'; return; }
+    const td = { ...f, id: uid(), createdAt: now() };
+    if (t.id === 'td-save-only') { await store.put('teardowns', td.id, td); clearTdForm(); toast('Teardown saved'); return; }
+    $('#td-msg').innerHTML = '';
+    await busy(t, 'Thinking… (up to a minute)', async () => {
+      try { const a = await ask(tdPrompt(td), { json: true, images: UI.tdImages }); td.analysis = a; await store.put('teardowns', td.id, td); await savePatterns(a, td); clearTdForm(); toast('Teardown saved'); openTeardown(td.id); }
+      catch (err) { $('#td-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; }
+    });
+    return;
+  }
+  if (ds.reanalyse) { const td = clone(get('teardowns', ds.reanalyse)); UI.tdImages = []; await busy(t, 'Thinking…', async () => {
+      try { const a = await ask(tdPrompt(td), { json: true }); td.analysis = a; await store.put('teardowns', td.id, td); await savePatterns(a, td); openTeardown(td.id); }
+      catch (err) { $('#dr-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; } }); return; }
+  if (ds.adapt) { const [id, i] = ds.adapt.split(':'); const td = get('teardowns', id); const x = list(td?.analysis?.adaptations)[+i]; if (!x) return;
+    UI.genSeed = { label: `Adaptation of ${td.creator || 'a reference video'}: ${x.title}`, text: `Adapt this idea from a teardown of ${td.creator || 'a reference video'} (${td.link || ''}). Transferable principle: ${td.analysis?.whyItWorked?.transferable || ''}. Adaptation: ${x.title}: ${x.logline} Hook: ${x.hook}` };
+    closeDrawer(); UI.sub.concepts = 'gen'; go('concepts'); return; }
+  if (ds.usePattern) { const p = get('patterns', ds.usePattern); UI.genSeed = { label: `Pattern: ${p.name}`, text: `Use the ${p.kind} pattern "${p.name}": ${p.description}`, patternId: p.id }; UI.sub.concepts = 'gen'; go('concepts'); return; }
+  if (t.id === 'pt-add') { const name = $('#pt-name').value.trim(); if (!name) { toast('Give the pattern a name.'); return; }
+    await store.put('patterns', uid(), { name, kind: $('#pt-kind').value, description: $('#pt-desc').value.trim(), examples: [] }); $('#pt-name').value = ''; $('#pt-desc').value = ''; toast('Pattern added'); return; }
+  if (ds.pf) { UI.patFilter = ds.pf; $$('#pt-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pf === ds.pf)); PAINT.teardown(); return; }
+
+  // watch
+  if (t.id === 'cp-save') {
+    const v = id => $('#cp-' + id).value.trim(); const name = v('name'); if (!name) { toast('Add the competitor’s name.'); return; }
+    const id = v('id') || uid(); const old = get('competitors', id) || {};
+    await store.put('competitors', id, { ...old, name, positioning: v('positioning'), voice: v('voice'), rhythm: v('rhythm'), formats: v('formats'), product: v('product'), links: Object.fromEntries(LINKS.map(([k]) => [k, v(k)])) });
+    clearCompForm(); toast('Competitor saved'); return; }
+  if (t.id === 'cp-clear') return clearCompForm();
+  if (ds.editComp) { const c = get('competitors', ds.editComp); if (!c) return; $('#cp-id').value = c.id; $('#cp-title').textContent = 'Edit ' + c.name;
+    for (const k of ['name','positioning','voice','rhythm','formats','product']) $('#cp-' + k).value = c[k] || ''; for (const [k] of LINKS) $('#cp-' + k).value = c.links?.[k] || ''; $('#cp-name').focus(); return; }
+  if (t.id === 'wl-run') {
+    const v = id => $('#wl-' + id).value.trim();
+    const w = { id: uid(), createdAt: now(), competitorId: v('comp'), platform: v('platform'), link: v('link'), views: v('views'), likes: v('likes'), comments: v('comments'), note: v('note') };
+    if (!w.link && !w.note) { $('#wl-msg').innerHTML = '<p class="err">Add a link or describe the post.</p>'; return; }
+    const comp = get('competitors', w.competitorId);
+    $('#wl-msg').innerHTML = '';
+    await busy(t, 'Thinking…', async () => {
+      try {
+        w.analysis = await ask(`${brandContext(800)}\n\nTASK: A competitor posted something. Read it from Videobolt's side and suggest how we respond. ${UI.watchImages.length ? 'Attached are screenshots of the post.' : ''}\n\nCompetitor: ${comp ? compSummary(comp) : 'unknown'}\nPlatform: ${w.platform}\nLink: ${w.link || 'none'}\nNumbers: views ${w.views || '?'}, likes ${w.likes || '?'}, comments ${w.comments || '?'}\nWhat it is: ${w.note || '(see screenshots)'}\nTheir earlier logged posts: ${S.watch.filter(x => x.competitorId === w.competitorId).slice(0, 5).map(x => x.analysis?.summary).filter(Boolean).join(' | ') || 'none'}\n\nResponse options: ignore (not relevant or not a threat), counter (answer it with our own angle), borrow (adapt the idea in our voice).\n\nReply with only JSON: {"summary":"one sentence on what they did","standout":"what's notable, if anything","signal":"new format | messaging shift | product or pricing | business as usual","response":"ignore | counter | borrow","why":"one or two sentences","angle":"the Videobolt video or message we'd make, or empty if ignore"}`, { json: true, images: UI.watchImages, tier: 'default' });
+        if (w.analysis?.response) w.analysis.response = String(w.analysis.response).toLowerCase().split(/[^a-z]/)[0];
+      } catch (err) { if (err?.code !== 'unavailable') $('#wl-msg').innerHTML = `<p class="err">${esc(errCopy(err))} The post was logged without a read.</p>`; }
+      await store.put('watch', w.id, w); ['link','views','likes','comments','note'].forEach(k => $('#wl-' + k).value = ''); UI.watchImages = []; $('#wl-thumbs').innerHTML = ''; $('#wl-images').value = ''; toast('Post logged');
+    });
+    return;
+  }
+  if (t.id === 'dg-run') {
+    const recent = S.watch.filter(w => Date.now() - new Date(w.createdAt) < 7 * 864e5);
+    $('#dg-msg').innerHTML = '';
+    await busy(t, 'Writing…', async () => {
+      try {
+        const lines = recent.map(w => `- ${get('competitors', w.competitorId)?.name || '?'} on ${w.platform} (${fmtDate(w.createdAt)}): ${w.analysis?.summary || w.note?.slice(0, 300) || w.link}${w.analysis?.signal ? ' [' + w.analysis.signal + ']' : ''} views ${w.views || '?'}`).join('\n');
+        const d = await ask(`${brandContext(600)}\n\nTASK: Write Videobolt's weekly market digest from the competitor posts the team logged this week.\n\nCompetitors we watch:\n${S.competitors.map(c => '- ' + compSummary(c)).join('\n')}\n\nLogged this week:\n${lines}\n\nEarlier shifts we noted: ${S.shifts.slice(0, 10).map(s => s.direction + ': ' + s.trend).join(' | ') || 'none'}\n\nReply with only JSON: {"headline":"one line","summary":"3-5 sentences: what they posted, what stood out, any new formats, messaging, product or pricing moves","moves":[{"competitor":"","what":"","response":"ignore | counter | borrow","angle":""}],"shifts":[{"trend":"","direction":"rising | fading | new","evidence":""}]}`, { json: true });
+        const id = uid(); const weekOf = new Date(Date.now() - 6 * 864e5).toISOString();
+        await store.put('digests', id, { ...d, weekOf, source: 'page' });
+        for (const s of list(d.shifts)) if (s?.trend) await store.put('shifts', uid(), { ...s, direction: String(s.direction || '').toLowerCase().split(/[^a-z]/)[0], digestId: id });
+        openDigest(id);
+      } catch (err) { $('#dg-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; }
+    });
+    return;
+  }
+  if (ds.watchConcept) { const w = get('watch', ds.watchConcept); const c = get('competitors', w.competitorId);
+    UI.genSeed = { label: `Response to ${c?.name || 'a competitor'}: ${w.analysis.summary}`, text: `A competitor (${c?.name || ''}) did this: ${w.analysis.summary}. Our suggested response is to ${w.analysis.response}: ${w.analysis.angle}` };
+    UI.sub.concepts = 'gen'; go('concepts'); return; }
+
+  // concepts
+  if (t.id === 'cg-seed-x') { UI.genSeed = null; PAINT.concepts(); return; }
+  if (t.id === 'cg-run') {
+    const v = id => $('#cg-' + id).value.trim();
+    const f = { series: v('series'), platform: v('platform'), goal: v('goal'), persona: v('persona'), hook: v('hook'), template: v('template'), patternId: v('pattern'), extra: v('extra'), n: +v('n') };
+    $('#cg-msg').innerHTML = '';
+    await busy(t, 'Thinking… (up to a minute)', async () => {
+      try {
+        const arr = list(await ask(conceptPrompt(f), { json: true }));
+        UI.genResults = arr.filter(c => c && c.title).map(c => ({ ...c, series: c.series || (f.series !== '__new' ? f.series : ''), platform: f.platform, goal: f.goal, persona: f.persona, _k: uid(),
+          source: UI.genSeed ? { type: 'seed', label: UI.genSeed.label } : f.patternId ? { type: 'pattern', id: f.patternId } : { type: 'generator' } }));
+        PAINT.concepts();
+      } catch (err) { $('#cg-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; }
+    });
+    return;
+  }
+  if (ds.saveGen) { const c = UI.genResults.find(x => x._k === ds.saveGen); if (!c) return; const { _k, ...rest } = c;
+    await store.put('concepts', uid(), { ...rest, status: 'idea', rating: 0, notes: '' }); UI.genResults = UI.genResults.filter(x => x._k !== ds.saveGen); PAINT.concepts(); toast('Saved to the board'); return; }
+  if (ds.rate) { const [id, n] = ds.rate.split(':'); const c = get('concepts', id); if (!c) return; await store.put('concepts', id, { ...c, rating: c.rating === +n ? 0 : +n }); return; }
+  if (ds.bf) { UI.boardFilter = ds.bf; render(); return; }
+  if (ds.toScript) { UI.scriptId = ds.toScript; lsSet('vbl-script', UI.scriptId); const d = get('scripts', ds.toScript);
+    UI.stage = d ? (STAGES.find(([k]) => !d.done?.[k])?.[0] || 'export') : 'beats';
+    const c = get('concepts', ds.toScript); if (c && (!c.status || c.status === 'idea' || c.status === 'shortlist')) store.put('concepts', c.id, { ...c, status: 'dev' });
+    go('scripts'); return; }
+
+  // scripts
+  if (t.id === 'sc-pick') { UI.scriptId = null; lsSet('vbl-script', null); render(); return; }
+  if (ds.stage) { await flushStage(); UI.stage = ds.stage; paintScriptEditor(); return; }
+  if (t.id === 'sc-gen') {
+    const c = get('concepts', UI.scriptId); const d = scriptDoc(c.id); const st = UI.stage; const box = $('#sc-text'); const before = box.value;
+    const ctl = new AbortController(); const stop = $('#sc-stop'); stop.hidden = false; stop.onclick = () => ctl.abort();
+    $('#sc-msg').innerHTML = ''; d.stages = { ...d.stages, [st]: before };
+    generating = true;
+    await busy(t, 'Thinking…', async () => {
+      try {
+        if (!SAMPLE) throw { code: 'unavailable', message: 'Generation is not available in this view.' };
+        box.value = 'Thinking…';
+        const r = await SAMPLE(stagePrompt(st, c, d, $('#sc-dir').value.trim()), { cache: false, signal: ctl.signal, onText: ({ text }) => { box.value = text; } });
+        box.value = r.text.trim(); await saveStage(); if (r.truncated) $('#sc-msg').innerHTML = '<p class="err">The answer was cut short. Ask for a shorter version in the direction box.</p>';
+      } catch (err) { box.value = err?.text?.trim() || before; if (err?.code !== 'cancelled') $('#sc-msg').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; else if (err?.text) await saveStage(); }
+      finally { stop.hidden = true; generating = false; }
+    });
+    updateReadTime(); return;
+  }
+  if (t.id === 'sc-approve') { await flushStage(); const d = clone(scriptDoc(UI.scriptId)); d.done = { ...d.done, [UI.stage]: !d.done?.[UI.stage] };
+    await store.put('scripts', d.id, d); if (d.done[UI.stage]) { const i = STAGES.findIndex(s => s[0] === UI.stage); UI.stage = STAGES[i + 1]?.[0] || 'export'; } paintScriptEditor(); return; }
+  if (t.id === 'bc-run') { const c = get('concepts', UI.scriptId); const d = clone(scriptDoc(c.id));
+    await busy(t, 'Checking…', async () => {
+      try { const ch = await ask(`${brandContext()}\n\nTASK: Check this script against the brand bible. Flag only real problems: words we avoid, off-voice lines, a weak or slow hook, unclear CTA, lines too long to say at ${wpm()} wpm, platform mismatches.\n\nSCRIPT:\n${d.stages.script}\n\nReply with only JSON: {"score":0-100,"verdict":"one or two sentences","issues":[{"quote":"exact line","problem":"","fix":"rewritten line"}],"strengths":["short"]}`, { json: true });
+        d.check = { ...ch, at: now() }; await store.put('scripts', d.id, d); $('#bc-out').innerHTML = checkHtml(d.check); }
+      catch (err) { $('#bc-out').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; } }); return; }
+  if (t.id === 'ex-prompter') return openPrompter(prompterText(scriptDoc(UI.scriptId)));
+  if (t.id === 'ex-copy') { const txt = packageText(get('concepts', UI.scriptId), scriptDoc(UI.scriptId)); try { await navigator.clipboard.writeText(txt); toast('Package copied'); } catch { drawer(`<h2>Copy the package</h2><textarea class="code" id="copy-box">${esc(txt)}</textarea>`); $('#copy-box').select(); } return; }
+  if (t.id === 'ex-dl' || t.id === 'ex-dl-tp') { const c = get('concepts', UI.scriptId); const d = scriptDoc(UI.scriptId); const slug = c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'script';
+    try { await DL.save(t.id === 'ex-dl' ? { filename: slug + '.md', data: packageText(c, d) } : { filename: slug + '-teleprompter.txt', data: prompterText(d) }); } catch (err) { if (err?.code && err.code !== 'cancelled' && err.code !== 'declined') toast('The download did not start.'); } return; }
+
+  // generic
+  if (ds.del) { const [coll, id] = ds.del.split(':');
+    if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; const old = t.textContent; t.textContent = 'Press again to delete'; setTimeout(() => { if (t.isConnected) { t.dataset.confirm = ''; t.textContent = old; } }, 3000); return; }
+    await store.del(coll, id); if (ds.close) closeDrawer(); toast('Deleted'); return; }
+  if (ds.openTd) return openTeardown(ds.openTd);
+  if (ds.openDg) return openDigest(ds.openDg);
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"].item')) { e.preventDefault(); e.target.click(); }
+  if (e.key === 'Escape' && $('#scrim')) closeDrawer();
+});
+document.addEventListener('mousedown', e => { if (e.target.id === 'scrim') closeDrawer(); });
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.bk) { draft()[el.dataset.bk] = el.value; markBibleDirty(); return; }
+  if (el.dataset.arr) { const b = draft(); const arr = list(b[el.dataset.arr]); arr[+el.dataset.i] = { ...arr[+el.dataset.i], [el.dataset.k]: el.value }; b[el.dataset.arr] = arr; markBibleDirty(); return; }
+  if (el.id === 'sc-text') { scheduleStageSave(); updateReadTime(); return; }
+  if (el.dataset.cnote) { clearTimeout(el._t); el._t = setTimeout(() => { const c = get('concepts', el.dataset.cnote); if (c && c.notes !== el.value) store.put('concepts', c.id, { ...c, notes: el.value }); }, 900); }
+});
+document.addEventListener('change', async e => {
+  const el = e.target;
+  if (el.dataset.status) { const c = get('concepts', el.dataset.status); if (c) await store.put('concepts', c.id, { ...c, status: el.value }); return; }
+  if (el.id === 'td-images' || el.id === 'wl-images') {
+    const files = [...el.files].slice(0, IMG?.maxCount || 4);
+    if (el.id === 'td-images') UI.tdImages = files; else UI.watchImages = files;
+    $(el.id === 'td-images' ? '#td-thumbs' : '#wl-thumbs').innerHTML = files.map(f => `<img alt="" src="${URL.createObjectURL(f)}">`).join('');
+  }
+});
+document.addEventListener('focusout', e => { if (e.target.dataset?.cnote) { const el = e.target; clearTimeout(el._t); const c = get('concepts', el.dataset.cnote); if (c && c.notes !== el.value) store.put('concepts', c.id, { ...c, notes: el.value }); } });
+
+let stageT;
+function scheduleStageSave() { const s = $('#sc-saved'); if (s) s.textContent = 'Editing…'; clearTimeout(stageT); stageT = setTimeout(saveStage, 1200); }
+async function flushStage() { if (stageT) { clearTimeout(stageT); stageT = null; await saveStage(); } }
+async function saveStage() {
+  stageT = null; const box = $('#sc-text'); if (!box || !UI.scriptId || UI.stage === 'export') return;
+  const val = box.value; if (val === 'Thinking…') return;
+  const d = clone(scriptDoc(UI.scriptId)); if ((d.stages?.[UI.stage] || '') === val) { const s = $('#sc-saved'); if (s) s.textContent = 'Saved'; return; }
+  d.stages = { ...d.stages, [UI.stage]: val }; await store.put('scripts', d.id, d);
+  const s = $('#sc-saved'); if (s) s.textContent = 'Saved';
+}
+function updateReadTime() { const el = $('#sc-rt'); const box = $('#sc-text'); if (UI.stage !== 'script' || !box) return; const rt = readTime(box.value);
+  if (el) el.textContent = `${rt.label} read · ${rt.words} words`; }
+function clearTdForm() { ['td-link','td-creator','td-followers','td-views','td-likes','td-comments','td-transcript','td-notes'].forEach(id => { const el = $('#' + id); if (el) el.value = ''; }); UI.tdImages = []; const th = $('#td-thumbs'); if (th) th.innerHTML = ''; const fi = $('#td-images'); if (fi) fi.value = ''; }
+function clearCompForm() { $$('#cp-form input, #cp-form textarea').forEach(el => el.value = ''); $('#cp-title').textContent = 'Add a competitor'; }
+window.addEventListener('beforeunload', () => { if (stageT) saveStage(); });
+
+// ---------- boot ----------
+render();
+store.init();
+initSample();
+})();
+</script>
