@@ -159,15 +159,6 @@ label.btn{position:relative}
 .drawer h2{font-family:var(--f-display);font-stretch:110%;font-size:22px;margin:0;line-height:1.15;text-wrap:balance}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
 
-/* teleprompter */
-.prompter{position:fixed;inset:0;background:#000;color:#fff;z-index:70;display:flex;flex-direction:column}
-.prompter .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:#111;font-size:13px}
-.prompter .bar button{background:#222;color:#fff;border:1px solid #333;border-radius:6px;padding:6px 12px;cursor:pointer}
-.prompter .bar label{display:flex;gap:6px;align-items:center;color:#bbb}
-.prompter .scroll{flex:1;overflow:hidden;position:relative}
-.prompter .text{padding:40vh 8vw 80vh;font:600 var(--psize,44px)/1.4 var(--f-body);white-space:pre-wrap;will-change:transform}
-.prompter .text.mirror{transform:scaleX(-1)}
-.prompter .guide{position:absolute;left:0;right:0;top:38vh;height:2px;background:rgba(255,80,70,.6);pointer-events:none}
 
 @media (max-width:980px){.cols,.cols.even{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){
@@ -966,7 +957,7 @@ function paintScriptEditor() {
     body = `<div class="cols even"><div class="panel"><h2>Package</h2><p class="hint">Concept, beats, script, shot list and captions in one file.</p>
       <dl class="kv"><dt>Read time</dt><dd>${d.stages?.script ? `${rt.label} at ${wpm()} wpm · ${rt.words} words${rt.spokenOnly ? ' spoken' : ''}` : '—'}</dd>
       ${STAGES.map(([k, l]) => `<dt>${l}</dt><dd>${d.done?.[k] ? '<span class="chip ok">Approved</span>' : d.stages?.[k] ? '<span class="chip warn">Draft</span>' : '<span class="chip">Empty</span>'}</dd>`).join('')}</dl>
-      <div class="actions" style="margin-top:14px"><button class="btn primary" id="ex-prompter" ${d.stages?.script ? '' : 'disabled'}>Open teleprompter</button><button class="btn" id="ex-copy">Copy package</button>${DL ? `<button class="btn" id="ex-dl">Download .md</button><button class="btn" id="ex-dl-tp" ${d.stages?.script ? '' : 'disabled'}>Download teleprompter .txt</button>` : ''}</div></div>
+      <div class="actions" style="margin-top:14px"><button class="btn primary" id="ex-prompter" ${d.stages?.script ? '' : 'disabled'}>Open teleprompter</button><button class="btn" id="ex-copy">Copy package</button>${DL ? `<button class="btn" id="ex-dl">Download .md</button><button class="btn" id="ex-dl-vtp" ${d.stages?.script ? '' : 'disabled'}>Download voice teleprompter</button><button class="btn" id="ex-dl-tp" ${d.stages?.script ? '' : 'disabled'}>Download teleprompter .txt</button>` : ''}</div></div>
       <div class="panel"><h2>Brand check</h2><p class="hint">Reads the script and shot list against the voice and the visual identity, and flags what drifts.</p><div id="bc-out">${checkHtml(d.check)}</div>
       <div class="actions"><button class="btn" id="bc-run" ${d.stages?.script ? '' : 'disabled'}>${d.check ? 'Check again' : 'Check script'}</button></div></div></div>`;
   } else {
@@ -1036,22 +1027,278 @@ function packageText(c, d) {
     STAGES.map(([k, l]) => `## ${l}\n\n${d.stages?.[k] || '_Not written yet._'}`).join('\n\n') + '\n';
 }
 function prompterText(d) { const sp = spokenLines(d.stages?.script); return sp.length ? sp.join('\n\n') : String(d.stages?.script || ''); }
-function openPrompter(text) {
-  const L = $('#layer');
-  L.innerHTML = `<div class="prompter" role="dialog" aria-label="Teleprompter"><div class="bar"><button id="tp-play">Start</button><label>Speed <input type="range" id="tp-speed" min="10" max="160" value="50"></label><label>Size <input type="range" id="tp-size" min="28" max="96" value="48"></label><label><input type="checkbox" id="tp-mirror"> Mirror</label><span style="flex:1"></span><button id="tp-reset">Back to top</button><button id="tp-close">Close</button></div>
-    <div class="scroll"><div class="guide"></div><div class="text" id="tp-text"></div></div></div>`;
-  const el = $('#tp-text'); el.textContent = text;
-  let y = 0, playing = false, last = 0, raf;
-  const apply = () => { el.style.transform = `translateY(${-y}px)` + ($('#tp-mirror').checked ? ' scaleX(-1)' : ''); };
-  const step = t => { if (!playing) return; const dt = last ? (t - last) / 1000 : 0; last = t; y += dt * +$('#tp-speed').value; apply(); raf = requestAnimationFrame(step); };
-  $('#tp-play').onclick = () => { playing = !playing; $('#tp-play').textContent = playing ? 'Pause' : 'Start'; last = 0; if (playing) raf = requestAnimationFrame(step); };
-  $('#tp-size').oninput = e => el.style.setProperty('--psize', e.target.value + 'px');
-  $('#tp-mirror').onchange = apply;
-  $('#tp-reset').onclick = () => { y = 0; apply(); };
-  const close = () => { playing = false; cancelAnimationFrame(raf); L.innerHTML = ''; document.removeEventListener('keydown', key); };
-  const key = e => { if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); $('#tp-play').click(); } };
-  $('#tp-close').onclick = close; document.addEventListener('keydown', key);
-  el.style.setProperty('--psize', '48px'); $('#tp-play').focus();
+// ---------- teleprompter (self-contained: also shipped as a standalone file) ----------
+const PROMPTER_CSS = `
+.vbp{position:fixed;inset:0;background:#000;color:#fff;z-index:70;display:flex;flex-direction:column;font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+.vbp-bar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:#111;font-size:13px;border-bottom:1px solid #222}
+.vbp-bar button,.vbp-bar select,.vbp-status button{background:#222;color:#fff;border:1px solid #3a3a3a;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+.vbp-bar button.on{background:#00D2DC;color:#02040E;border-color:#00D2DC;font-weight:600}
+.vbp-bar label{display:flex;gap:6px;align-items:center;color:#bbb}
+.vbp-sp{flex:1}
+.vbp-status{padding:6px 16px;font-size:13px;color:#aab;background:#0a0a0a;min-height:32px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #1a1a1a}
+.vbp-mic{width:9px;height:9px;border-radius:50%;background:#555;flex:none}
+.vbp-mic.live{background:#ff4d4d;animation:vbp-pulse 1.2s infinite}
+@keyframes vbp-pulse{50%{opacity:.35}}
+.vbp-heard{color:#6d7380;font-style:italic;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:48ch;min-width:0}
+.vbp-scroll{flex:1;overflow:hidden;position:relative}
+.vbp-text{position:relative;padding:0 8vw 80vh;font-weight:600;font-size:var(--psize,52px);line-height:1.4;will-change:transform}
+.vbp-text p{margin:0 0 .8em}
+.vbp-text span{cursor:pointer;transition:color .25s}
+.vbp-text span.done{color:#666b77}
+.vbp-text span.cur{color:#00D2DC}
+.vbp-guide{position:absolute;left:0;right:0;top:36%;border-top:2px solid rgba(0,210,220,.5);pointer-events:none;z-index:1}
+.vbp-guide::before{content:"";position:absolute;left:6px;top:-9px;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:12px solid #00D2DC}
+.vbp-help{position:absolute;right:16px;top:110px;background:#15161a;border:1px solid #333;border-radius:10px;padding:14px 18px;max-width:min(440px,calc(100% - 32px));font-size:14px;line-height:1.55;z-index:3;color:#ddd}
+.vbp-help h3{margin:0 0 6px;font-size:15px;color:#fff}
+.vbp-help ul{margin:6px 0;padding-left:18px}
+.vbp-help b{color:#00D2DC;font-weight:600}
+.vbp-help p{margin:6px 0;color:#99a}
+@media (prefers-reduced-motion: reduce){.vbp-mic.live{animation:none}.vbp-text span{transition:none}}
+`;
+function mountPrompter(root, text, opts) {
+  opts = opts || {};
+  const q = s => root.querySelector(s);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const NUMS = { zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10', eleven: '11', twelve: '12', twenty: '20', hundred: '100', thousand: '1000' };
+  const norm = w => { w = String(w).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, '').replace(/[^a-z0-9%]+/g, ''); return NUMS[w] || w; };
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const store = { get(k, d) { try { const v = localStorage.getItem('vbp-' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('vbp-' + k, JSON.stringify(v)); } catch (e) {} } };
+
+  root.innerHTML = `<div class="vbp" role="dialog" aria-label="Teleprompter">
+    <div class="vbp-bar">
+      <button data-a="voice">Follow my voice</button>
+      <button data-a="auto">Auto-scroll</button>
+      <label>Speed <input type="range" data-k="speed" min="10" max="160"></label>
+      <label>Size <input type="range" data-k="size" min="28" max="110"></label>
+      <label><input type="checkbox" data-k="mirror"> Mirror</label>
+      <label>Language <select data-k="lang"><option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="sr-RS">Srpski</option><option value="es-ES">Español</option></select></label>
+      <span class="vbp-sp"></span>
+      <button data-a="help">Voice commands</button>
+      <button data-a="top">Back to top</button>
+      ${opts.onClose ? '<button data-a="close">Close</button>' : ''}
+    </div>
+    <div class="vbp-status" aria-live="polite"><span class="vbp-mic"></span><span class="vbp-msg"></span><span class="vbp-heard"></span></div>
+    <div class="vbp-scroll"><div class="vbp-guide"></div><div class="vbp-text"></div></div>
+    <div class="vbp-help" hidden>
+      <h3>Voice commands</h3>
+      <p>Start a command with <b>prompter</b>, so lines in your script never trigger one.</p>
+      <ul>
+        <li><b>prompter pause</b> and <b>prompter resume</b> (while paused, <b>resume</b> on its own works)</li>
+        <li><b>prompter back</b> goes to the previous paragraph</li>
+        <li><b>prompter next</b> skips to the next paragraph</li>
+        <li><b>prompter top</b> starts again from the beginning</li>
+        <li><b>prompter bigger</b> or <b>smaller</b> changes text size</li>
+        <li><b>prompter faster</b> or <b>slower</b> changes auto-scroll speed</li>
+        <li><b>prompter auto</b> switches to auto-scroll, <b>prompter voice</b> back to following</li>
+      </ul>
+      <p>Tap any word to jump there. Keyboard: Space pauses or resumes, arrow keys move by paragraph, Esc closes.</p>
+      <p>Speech is recognised by your browser. Chrome and Edge send the audio to Google's speech service to do this. Firefox doesn't support it.</p>
+    </div>
+  </div>`;
+
+  // build words
+  const box = q('.vbp-text'), scrollEl = q('.vbp-scroll'), guide = q('.vbp-guide');
+  const W = []; const paraStarts = [];
+  String(text || '').split(/\n\s*\n|\n/).map(s => s.trim()).filter(Boolean).forEach(par => {
+    const p = document.createElement('p'); let first = true;
+    par.split(/\s+/).forEach((tok, k) => {
+      const sp = document.createElement('span'); sp.textContent = tok;
+      const n = norm(tok);
+      if (n) { if (first) { paraStarts.push(W.length); first = false; } sp.dataset.i = W.length; W.push({ el: sp, n }); }
+      if (k) p.append(' '); p.append(sp);
+    });
+    box.append(p);
+  });
+
+  // settings
+  const S = { speed: store.get('speed', 50), size: store.get('size', 52), mirror: store.get('mirror', false), lang: store.get('lang', 'en-US') };
+  q('[data-k=speed]').value = S.speed; q('[data-k=size]').value = S.size; q('[data-k=mirror]').checked = S.mirror; q('[data-k=lang]').value = S.lang;
+  const applySize = () => { box.style.setProperty('--psize', S.size + 'px'); layout(); };
+
+  let mode = 'idle', paused = false, pos = 0, shown = -1, y = 0, targetY = 0, last = 0, raf = 0, alive = true;
+  let rec = null, micBlocked = false, lastCmd = '';
+
+  const msg = (t, html) => { const m = q('.vbp-msg'); if (html) m.innerHTML = t; else m.textContent = t; };
+  const heard = t => { q('.vbp-heard').textContent = t ? '“' + t + '”' : ''; };
+  const mic = on => q('.vbp-mic').classList.toggle('live', !!on);
+  const buttons = () => { q('[data-a=voice]').classList.toggle('on', mode === 'voice'); q('[data-a=auto]').classList.toggle('on', mode === 'auto');
+    q('[data-a=voice]').textContent = mode === 'voice' ? (paused ? 'Resume following' : 'Pause following') : 'Follow my voice';
+    q('[data-a=auto]').textContent = mode === 'auto' ? (paused ? 'Resume scroll' : 'Pause scroll') : 'Auto-scroll'; };
+
+  function guideY() { return guide.offsetTop; }
+  function layout() { box.style.paddingTop = guideY() + 'px'; if (mode !== 'auto') targetY = wordY(pos); }
+  function wordY(i) { if (!W.length) return 0; const w = W[Math.min(Math.max(i - 1, 0), W.length - 1)].el; return Math.max(0, w.offsetTop - guideY() - w.offsetHeight * 0.2); }
+  function mark(newPos) {
+    const a = Math.max(0, Math.min(shown, newPos) - 2), b = Math.min(W.length, Math.max(shown, newPos) + 2);
+    for (let i = (shown < 0 ? 0 : a); i < (shown < 0 ? W.length : b); i++) { W[i].el.classList.toggle('done', i < newPos - 1); W[i].el.classList.toggle('cur', i === newPos - 1); }
+    shown = newPos;
+  }
+  function setPos(p) { pos = Math.max(0, Math.min(W.length, p)); mark(pos); targetY = wordY(pos); if (pos >= W.length && W.length) msg('End of script. Say “prompter top” to start again.'); }
+  function paraJump(dir) {
+    let cur = 0; for (let k = 0; k < paraStarts.length; k++) if (paraStarts[k] <= Math.max(pos - 1, 0)) cur = k;
+    let to = dir < 0 ? ((pos - 1) - paraStarts[cur] > 2 ? cur : cur - 1) : cur + 1;
+    to = Math.max(0, Math.min(paraStarts.length - 1, to));
+    setPos(paraStarts[to] || 0); targetY = wordY((paraStarts[to] || 0) + 1); if (mode === 'auto') y = targetY;
+  }
+
+  // fuzzy word match
+  function lev1(a, b) { if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0;
+    while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++e > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+    return e + (a.length - i) + (b.length - j) <= 1; }
+  function same(a, b) { if (a === b) return true; if (a.length >= 4 && b.length >= 4) return a.startsWith(b) || b.startsWith(a) || lev1(a, b); return false; }
+  function align(tokens) {
+    const k = Math.min(4, tokens.length); if (!k || !W.length) return;
+    const tail = tokens.slice(-k);
+    let best = -1, bestScore = 0, bestDist = 1e9;
+    const lo = Math.max(0, pos - 6), hi = Math.min(W.length - 1, pos + 40);
+    for (let j = lo; j <= hi; j++) {
+      let s = 0;
+      for (let t = 0; t < k; t++) { const wi = j - (k - 1 - t); if (wi >= 0 && same(W[wi].n, tail[t])) s++; }
+      const need = k === 1 ? 1 : 2;
+      const dist = j >= pos - 1 ? j - (pos - 1) : (pos - 1 - j) * 3; // prefer moving forward
+      if (s >= need && (s > bestScore || (s === bestScore && dist < bestDist))) { best = j; bestScore = s; bestDist = dist; }
+    }
+    if (best < 0) return;
+    if (k === 1 && (best > pos + 3 || tail[0].length < 3)) return;           // a lone word only nudges forward
+    if (best + 1 < pos && bestScore < Math.min(3, k)) return;                 // only go back on a strong match
+    if (best + 1 !== pos) setPos(best + 1);
+  }
+
+  // commands
+  const CMDS = {
+    pause: ['pause', 'stop', 'wait', 'hold'], resume: ['resume', 'continue', 'go', 'start', 'play'],
+    back: ['back', 'previous', 'rewind', 'again'], next: ['next', 'skip', 'forward'], top: ['top', 'restart', 'beginning'],
+    bigger: ['bigger', 'larger'], smaller: ['smaller'], faster: ['faster', 'quicker'], slower: ['slower'], auto: ['auto', 'automatic'], voice: ['voice', 'follow'], close: ['close', 'exit'],
+  };
+  function command(tokens, isFinal, key) {
+    let i = tokens.lastIndexOf('prompter'); if (i < 0) i = tokens.lastIndexOf('teleprompter');
+    let word = null;
+    if (i >= 0 && tokens[i + 1]) word = tokens[i + 1];
+    else if (paused && mode === 'voice' && isFinal) { const t = tokens[tokens.length - 1]; if (CMDS.resume.includes(t)) word = t; }
+    if (!word) return i >= 0; // swallow a bare wake word
+    const cmd = Object.keys(CMDS).find(c => CMDS[c].includes(word)); if (!cmd) return i >= 0;
+    const id = key + ':' + cmd; if (id === lastCmd) return true; lastCmd = id;
+    run(cmd, true); return true;
+  }
+  function run(cmd, spoken) {
+    if (cmd === 'pause') { paused = true; msg(mode === 'voice' ? 'Paused. Say “prompter resume” or press Space.' : 'Paused.'); }
+    else if (cmd === 'resume') { paused = false; last = 0; msg(mode === 'voice' ? 'Listening… keep reading.' : 'Scrolling.'); }
+    else if (cmd === 'back') paraJump(-1);
+    else if (cmd === 'next') paraJump(1);
+    else if (cmd === 'top') { setPos(0); y = 0; targetY = 0; }
+    else if (cmd === 'bigger' || cmd === 'smaller') { S.size = Math.max(28, Math.min(110, S.size + (cmd === 'bigger' ? 8 : -8))); q('[data-k=size]').value = S.size; store.set('size', S.size); applySize(); }
+    else if (cmd === 'faster' || cmd === 'slower') { S.speed = Math.max(10, Math.min(160, S.speed + (cmd === 'faster' ? 15 : -15))); q('[data-k=speed]').value = S.speed; store.set('speed', S.speed); }
+    else if (cmd === 'auto') startAuto();
+    else if (cmd === 'voice') startVoice();
+    else if (cmd === 'close') close();
+    if (spoken) heard('→ ' + cmd);
+    buttons();
+  }
+
+  // speech recognition
+  function startVoice() {
+    if (!SR) { mode = 'idle'; buttons(); msg('This browser can’t recognise speech. Use Chrome, Edge or Safari, or use Auto-scroll.'); return; }
+    if (micBlocked) { blocked(); return; }
+    mode = 'voice'; paused = false; buttons(); targetY = wordY(pos); listen();
+  }
+  function listen() {
+    if (rec || mode !== 'voice' || !alive) return;
+    const r = new SR(); rec = r;
+    r.lang = S.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onstart = () => { mic(true); msg(paused ? 'Paused. Say “prompter resume”.' : 'Listening… start reading.'); };
+    r.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i], said = res[0].transcript, toks = said.split(/\s+/).map(norm).filter(Boolean);
+        heard(said.trim().split(/\s+/).slice(-8).join(' '));
+        if (command(toks, res.isFinal, i + ':' + (r._n || 0))) continue;
+        if (!paused) align(toks);
+      }
+      if (e.results[e.results.length - 1]?.isFinal) r._n = (r._n || 0) + 1;
+    };
+    r.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { micBlocked = true; blocked(); }
+      else if (e.error === 'audio-capture') { msg('No microphone was found. Plug one in, then press Follow my voice.'); mode = 'idle'; buttons(); }
+      else if (e.error === 'network') msg('Speech recognition needs an internet connection.');
+      else if (e.error === 'language-not-supported') msg('That language isn’t supported here. Pick another one.');
+    };
+    r.onend = () => { if (rec === r) rec = null; mic(false); if (mode === 'voice' && alive && !micBlocked) setTimeout(listen, 200); };
+    try { r.start(); } catch (err) { rec = null; micBlocked = true; blocked(); }
+  }
+  function stopListening() { const r = rec; rec = null; mic(false); if (r) { r.onend = null; try { r.abort(); } catch (e) {} } }
+  function blocked() {
+    stopListening(); mode = 'idle'; buttons();
+    if (opts.download) { msg('The microphone is blocked here. <button data-a="download">Download voice teleprompter</button> and open the file in Chrome, Edge or Safari.', true); }
+    else msg('The microphone is blocked. Allow microphone access for this page in your browser’s address bar, then press Follow my voice again.');
+  }
+  function startAuto() { stopListening(); mode = 'auto'; paused = false; last = 0; y = Math.max(y, 0); msg('Auto-scrolling. Space pauses.'); heard(''); buttons(); }
+
+  // render loop
+  function frame(t) {
+    if (!alive) return;
+    const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
+    const maxY = Math.max(0, box.scrollHeight - scrollEl.clientHeight * 0.6);
+    if (mode === 'auto' && !paused) y += dt * S.speed;
+    else if (mode === 'voice' || mode === 'idle') y += (targetY - y) * Math.min(1, dt * 5);
+    y = Math.max(0, Math.min(maxY, y));
+    box.style.transform = 'translateY(' + (-y).toFixed(1) + 'px)' + (S.mirror ? ' scaleX(-1)' : '');
+    raf = requestAnimationFrame(frame);
+  }
+
+  // controls
+  function onClick(e) {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (a === 'voice') { if (mode === 'voice') run(paused ? 'resume' : 'pause'); else startVoice(); }
+    else if (a === 'auto') { if (mode === 'auto') run(paused ? 'resume' : 'pause'); else startAuto(); }
+    else if (a === 'top') run('top');
+    else if (a === 'help') { const h = q('.vbp-help'); h.hidden = !h.hidden; }
+    else if (a === 'close') close();
+    else if (a === 'download') opts.download?.();
+    else { const i = e.target.dataset?.i; if (i != null) { setPos(+i + 1); if (mode === 'auto') y = targetY; } }
+  }
+  function onInput(e) {
+    const k = e.target.dataset.k; if (!k) return;
+    if (k === 'speed') { S.speed = +e.target.value; store.set('speed', S.speed); }
+    if (k === 'size') { S.size = +e.target.value; store.set('size', S.size); applySize(); }
+    if (k === 'mirror') { S.mirror = e.target.checked; store.set('mirror', S.mirror); }
+    if (k === 'lang') { S.lang = e.target.value; store.set('lang', S.lang); if (mode === 'voice') { stopListening(); listen(); } }
+  }
+  function onKey(e) {
+    if (e.target.matches?.('select,input[type=range]') && e.key !== 'Escape') return;
+    if (e.key === 'Escape') { if (!q('.vbp-help').hidden) q('.vbp-help').hidden = true; else close(); }
+    else if (e.key === ' ') { e.preventDefault(); if (mode === 'idle') startAuto(); else run(paused ? 'resume' : 'pause'); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); paraJump(1); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); paraJump(-1); }
+  }
+  function onResize() { layout(); }
+  root.addEventListener('click', onClick); root.addEventListener('input', onInput); root.addEventListener('change', onInput);
+  document.addEventListener('keydown', onKey); window.addEventListener('resize', onResize);
+  function close() {
+    if (!alive) return; alive = false; stopListening(); cancelAnimationFrame(raf);
+    document.removeEventListener('keydown', onKey); window.removeEventListener('resize', onResize);
+    opts.onClose?.();
+  }
+
+  applySize(); mark(0); buttons();
+  msg(W.length ? (SR ? 'Press Follow my voice and start reading, or use Auto-scroll.' : 'Use Auto-scroll. This browser can’t follow your voice.') : 'There are no spoken lines in this script yet.');
+  raf = requestAnimationFrame(frame);
+  q('[data-a=voice]').focus();
+  return { close, _state: () => ({ pos, mode, paused, y, targetY }), _feed: (said, fin) => { const toks = said.split(/\s+/).map(norm).filter(Boolean); if (!command(toks, fin !== false, 'test' + Math.random())) if (!paused) align(toks); } };
+}
+function standalonePrompter(title, text) {
+  const safe = s => JSON.stringify(s).replace(/</g, '\\u003c');
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + esc(title) + ' · Teleprompter</title><style>html,body{margin:0;height:100%;background:#000}' + PROMPTER_CSS + '</style></head><body><div id="root"></div><script>\n'
+    + '(' + mountPrompter.toString().replace(/<\/script/gi, '<\\/script') + ')(document.getElementById("root"), ' + safe(text) + ', {});\n'
+    + '<\/script></body></html>';
+}
+function openPrompter(text, title) {
+  if (!document.getElementById('vbp-css')) { const st = document.createElement('style'); st.id = 'vbp-css'; st.textContent = PROMPTER_CSS; document.head.append(st); }
+  const L = $('#layer'); L.innerHTML = '<div id="vbp-root"></div>';
+  const slug = String(title || 'script').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'script';
+  return mountPrompter($('#vbp-root'), text, {
+    onClose: () => { L.innerHTML = ''; },
+    download: DL ? () => DL.save({ filename: slug + '-voice-teleprompter.html', data: standalonePrompter(title || 'Script', text) }).catch(err => { if (err?.code && err.code !== 'cancelled' && err.code !== 'declined') toast('The download did not start.'); }) : null,
+  });
 }
 
 // ---------- drawer ----------
@@ -1222,7 +1469,9 @@ document.addEventListener('click', async e => {
         const ch = await ask(L.prompt, { json: true, images: L.images });
         d.check = { ...ch, at: now() }; await store.put('scripts', d.id, d); $('#bc-out').innerHTML = checkHtml(d.check); }
       catch (err) { $('#bc-out').innerHTML = `<p class="err">${esc(errCopy(err))}</p>`; } }); return; }
-  if (t.id === 'ex-prompter') return openPrompter(prompterText(scriptDoc(UI.scriptId)));
+  if (t.id === 'ex-prompter') return openPrompter(prompterText(scriptDoc(UI.scriptId)), get('concepts', UI.scriptId)?.title);
+  if (t.id === 'ex-dl-vtp') { const c = get('concepts', UI.scriptId); const slug = c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'script';
+    try { await DL.save({ filename: slug + '-voice-teleprompter.html', data: standalonePrompter(c.title, prompterText(scriptDoc(UI.scriptId))) }); } catch (err) { if (err?.code && err.code !== 'cancelled' && err.code !== 'declined') toast('The download did not start.'); } return; }
   if (t.id === 'ex-copy') { const txt = packageText(get('concepts', UI.scriptId), scriptDoc(UI.scriptId)); try { await navigator.clipboard.writeText(txt); toast('Package copied'); } catch { drawer(`<h2>Copy the package</h2><textarea class="code" id="copy-box">${esc(txt)}</textarea>`); $('#copy-box').select(); } return; }
   if (t.id === 'ex-dl' || t.id === 'ex-dl-tp') { const c = get('concepts', UI.scriptId); const d = scriptDoc(UI.scriptId); const slug = c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'script';
     try { await DL.save(t.id === 'ex-dl' ? { filename: slug + '.md', data: packageText(c, d) } : { filename: slug + '-teleprompter.txt', data: prompterText(d) }); } catch (err) { if (err?.code && err.code !== 'cancelled' && err.code !== 'declined') toast('The download did not start.'); } return; }
