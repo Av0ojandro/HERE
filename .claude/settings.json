@@ -10,7 +10,18 @@
       "Workflow",
       "mcp__claude-code-remote__create_session",
       "mcp__claude-code-remote__create_trigger",
-      "mcp__claude-code-remote__fire_trigger"
+      "mcp__claude-code-remote__fire_trigger",
+      "WebFetch",
+      "mcp__Google_Drive",
+      "mcp__claude-code-remote__add_repo",
+      "mcp__claude-code-remote__request_computer_folder",
+      "mcp__claude-code-remote__send_message",
+      "mcp__claude-code-remote__watch_url",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(sftp *)",
+      "Bash(claude mcp *)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": false
 }
