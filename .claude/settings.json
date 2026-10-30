@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(gcloud *)",
+      "Bash(bq *)",
+      "Bash(gsutil *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "WebSearch",
+      "Workflow",
+      "mcp__claude-code-remote__create_session",
+      "mcp__claude-code-remote__create_trigger",
+      "mcp__claude-code-remote__fire_trigger"
+    ]
+  }
+}
